@@ -573,3 +573,4 @@ print(f" Durchschnittlicher μ-Wert: {mean_mu:.4f}")
 print(f" Sicher klassifiziert (μ < 0): {safe_classified}/{total} = {safe_classified/total:.1%}")
 # Gibt die Anzahl und den Prozentsatz der Testpunkte aus, deren μ-Wert >= 0 war.
 print(f" Unsicher/falsch (μ ≥ 0): {unsafe_classified}/{total} = {unsafe_classified/total:.1%}")
+# test git push
