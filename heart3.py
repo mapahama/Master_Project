@@ -118,7 +118,7 @@ print(f"Daten aufgeteilt: {X_train.shape[0]} Trainingspunkte, {X_test.shape[0]} 
 # Initialisierung und Training des GLVQ-Modells.
 
 # Erstelle eine Instanz des 'GlvqModel'.
-model = GlvqModel(prototypes_per_class=9, random_state=42) # <-- hier wird Anzahl von Prototypen bestimmt! TODO - dynamisch machen
+model = GlvqModel(prototypes_per_class=3, random_state=42) # <-- hier wird Anzahl von Prototypen bestimmt! 3 Prototypen pro Klasse
 print(f"Trainiere GLVQ-Modell mit {model.prototypes_per_class} Prototypen pro Klasse...")
 
 # Trainiere das GLVQ-Modell mit den Trainingsdaten (`X_train`, `y_train`).
@@ -400,10 +400,32 @@ else:
 # === === === === === === === === === === === === === === === === === === ===
 # visualisiert die vom GLVQ-Modell gelernten Entscheidungsgrenzn
 
+# ! Der -->PCA-Plot reduziert die Daten auf 2 Dimensionen. 
+#   Ein -->Scree-Plot  zeigt wie viel Prozent der ursprünglichen Varianz der Daten
+#   durch diese ersten beiden Hauptkomponenten abgedeckt werden. 
+#   "Evaluierung von Verlust von Datengenauigkeit" im PCA-Plot
+
+# PCA für Scree Plot (alle Komponenten)
+pca_for_scree = PCA(n_components=None) 
+pca_for_scree.fit(X_train) # Nur auf Trainingsdaten fitten
+
+# Scree-Plot erstellen
+plt.figure(figsize=(8, 5))
+plt.plot(np.arange(1, pca_for_scree.n_components_ + 1), pca_for_scree.explained_variance_ratio_, marker='o', linestyle='--')
+plt.title('Scree-Plot für PCA')
+plt.xlabel('Anzahl der Hauptkomponenten')
+plt.ylabel('Erklärte Varianz (Explained Variance Ratio)')
+plt.xticks(np.arange(1, pca_for_scree.n_components_ + 1))
+plt.grid(True)
+plt.show()
+
+# Ausgabe der  erklärten Varianz für die ersten beiden Komponenten / Vollständigkeit der Daten auf dem PCA Plot
+print(f"Vollständigkeit der Daten auf dem PCA Plot: {np.sum(pca_for_scree.explained_variance_ratio_[:2]):.4f}")
+
+# 1. PCA zur 2D Dimensionsreduktion 
 print("\n\n--- Visualisierung der Entscheidungsgrenzen (2D PCA, 2 Klassen) mit Patient Hervorhebung ---")
 
-# 1. PCA zur Dimensionsreduktion
-pca = PCA(n_components=2)
+pca = PCA(n_components=2) # --> 2 Dimensionen 
 # Passe das PCA-Modell an die Trainingsdaten an (`fit`) und transformiere sie dann (`transform`).
 X_train_pca = pca.fit_transform(X_train) 
 X_test_pca = pca.transform(X_test)     # X_test ist bereits skaliert
