@@ -122,16 +122,21 @@ for n_prototypes in prototypes_to_test:
         fold_precisions.append(precision_score(y_test, y_pred, zero_division=0))
         fold_recalls.append(recall_score(y_test, y_pred, zero_division=0))
 
-    # Berechne den Durchschnitt der Metriken über alle Folds
+    # Berechne den Durchschnitt und Standardabweichung der Metriken über alle Folds
     proto_cv_results[n_prototypes] = {
-        'mean_accuracy': np.mean(fold_accuracies),
+        'mean_accuracy': np.mean(fold_accuracies),# <-- Durchschnitt
+        'std_accuracy': np.std(fold_accuracies),  # <-- Standardabweichung
         'mean_precision': np.mean(fold_precisions),
-        'mean_recall': np.mean(fold_recalls)
+        'std_precision': np.std(fold_precisions), 
+        'mean_recall': np.mean(fold_recalls),
+        'std_recall': np.std(fold_recalls)       
     }
     
-    print(f"  -> Avg. Accuracy: {proto_cv_results[n_prototypes]['mean_accuracy']:.4f}")
-    print(f"  -> Avg. Precision: {proto_cv_results[n_prototypes]['mean_precision']:.4f}")
-    print(f"  -> Avg. Recall: {proto_cv_results[n_prototypes]['mean_recall']:.4f}")
+    # Gib die Ergebnisse mit Durchschnitt und Standardabweichung aus
+    print(f"  -> Durchschnitt Accuracy:  {proto_cv_results[n_prototypes]['mean_accuracy']:.4f} --- Standardabweichung: (+/- {proto_cv_results[n_prototypes]['std_accuracy']:.4f})")
+    print(f"  -> Durchschnitt Precision: {proto_cv_results[n_prototypes]['mean_precision']:.4f} --- Standardabweichung: (+/- {proto_cv_results[n_prototypes]['std_precision']:.4f})")
+    print(f"  -> Durchschnitt Recall:    {proto_cv_results[n_prototypes]['mean_recall']:.4f} --- Standardabweichung: (+/- {proto_cv_results[n_prototypes]['std_recall']:.4f})")
+
 
 # Finde die beste Anzahl an Prototypen basierend auf der höchsten mittleren Genauigkeit
 best_n_prototypes = max(proto_cv_results, key=lambda k: proto_cv_results[k]['mean_accuracy'])
@@ -181,13 +186,18 @@ for beta_value in betas_to_test:
     # Berechne den Durchschnitt der Metriken über alle Folds
     beta_cv_results[beta_value] = {
         'mean_accuracy': np.mean(fold_accuracies),
+        'std_accuracy': np.std(fold_accuracies),
         'mean_precision': np.mean(fold_precisions),
-        'mean_recall': np.mean(fold_recalls)
-    }
+        'std_precision': np.std(fold_precisions),
+        'mean_recall': np.mean(fold_recalls),
+        'std_recall': np.std(fold_recalls)
+    } 
     
-    print(f"  -> Avg. Accuracy: {beta_cv_results[beta_value]['mean_accuracy']:.4f}")
-    print(f"  -> Avg. Precision: {beta_cv_results[beta_value]['mean_precision']:.4f}")
-    print(f"  -> Avg. Recall: {beta_cv_results[beta_value]['mean_recall']:.4f}")
+    # Gib die Ergebnisse mit Durchschnitt und Standardabweichung aus
+    print(f"  -> Durchschnitt Accuracy: {beta_cv_results[beta_value]['mean_accuracy']:.4f} --- Standardabweichung: (+/- {beta_cv_results[beta_value]['std_accuracy']:.4f})")
+    print(f"  -> Durchschnitt Precision: {beta_cv_results[beta_value]['mean_precision']:.4f} --- Standardabweichung: (+/- {beta_cv_results[beta_value]['std_precision']:.4f})")
+    print(f"  -> Durchschnitt Recall: {beta_cv_results[beta_value]['mean_recall']:.4f} --- Standardabweichung: (+/- {beta_cv_results[beta_value]['std_recall']:.4f})")
+
 
 # Finde den besten Beta-Wert
 best_beta = max(beta_cv_results, key=lambda k: beta_cv_results[k]['mean_accuracy'])
