@@ -209,11 +209,20 @@ print(f"Bester Beta-Wert: {best_beta} (basierend auf der höchsten mittleren Gen
 # === === === === === === === === ===
 # ===  6. FINALES ERGEBNIS        ===
 # === === === === === === === === ===
-print("\n\n=======================================================")
+print("\n\n==================================================")
 print("===           FINALES TUNING-ERGEBNIS           ===")
-print("=======================================================")
+print("===================================================")
 print(f"\nDie beste gefundene Hyperparameter-Kombination ist:")
 print(f"  -> Anzahl Prototypen pro Klasse: {best_n_prototypes}")
 print(f"  -> Beta-Parameter: {best_beta}")
+
+# Hole die Leistungsmetriken für die beste Kombination
+final_performance = beta_cv_results[best_beta] # enthält die besten Beta-Parameter und Anzahl Prototypen für max. Accuracy
+
+# Leistungsmetriken fürs finale Modell !
+print("\nLeistung des finalen Modells (geschätzt durch 5-fache Kreuzvalidierung):")
+print(f"  -> Accuracy:  {final_performance['mean_accuracy']:.4f} (+/- {final_performance['std_accuracy']:.4f})")
+print(f"  -> Precision: {final_performance['mean_precision']:.4f} (+/- {final_performance['std_precision']:.4f})")
+print(f"  -> Recall:    {final_performance['mean_recall']:.4f} (+/- {final_performance['std_recall']:.4f})")
 
 # TODO:  GridSearchGV  ausprobieren
