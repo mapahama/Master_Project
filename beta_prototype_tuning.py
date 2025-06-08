@@ -146,7 +146,7 @@ print(f"Beste Anzahl an Prototypen pro Klasse: {best_n_prototypes} (basierend au
 print(f"\n--- STUFE 2: Starte 5-fache Kreuzvalidierung zum Tunen des BETA-PARAMETERS (mit {best_n_prototypes} Prototypen) ---")
 
 # Definiere die zu testenden Beta-Werte
-betas_to_test = [1, 2, 5]
+betas_to_test = [1, 2, 3, 4, 5]
 
 # Speicher für die Ergebnisse der Beta-Kreuzvalidierung
 beta_cv_results = {}
@@ -205,4 +205,3 @@ print("=======================================================")
 print(f"\nDie beste gefundene Hyperparameter-Kombination ist:")
 print(f"  -> Anzahl Prototypen pro Klasse: {best_n_prototypes}")
 print(f"  -> Beta-Parameter: {best_beta}")
-
