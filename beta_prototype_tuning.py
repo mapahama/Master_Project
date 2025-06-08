@@ -197,7 +197,7 @@ print(f"Bester Beta-Wert: {best_beta} (basierend auf der höchsten mittleren Gen
 
 
 # === === === === === === === === ===
-# ===  6. FINALES ERGEBNIS       ===
+# ===  6. FINALES ERGEBNIS        ===
 # === === === === === === === === ===
 print("\n\n=======================================================")
 print("===           FINALES TUNING-ERGEBNIS           ===")
@@ -205,3 +205,5 @@ print("=======================================================")
 print(f"\nDie beste gefundene Hyperparameter-Kombination ist:")
 print(f"  -> Anzahl Prototypen pro Klasse: {best_n_prototypes}")
 print(f"  -> Beta-Parameter: {best_beta}")
+
+# TODO:  GridSearchGV  ausprobieren
