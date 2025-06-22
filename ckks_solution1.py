@@ -226,3 +226,9 @@ decrypted_diff = enc_diff.decrypt()
 
 print("Erwartete Differenz:", patient_vector - prototype_vector) # Output: [0.5 0.5 0.5]
 print("Entschlüsselte Differenz:", decrypted_diff) # Output: [0.4999999999831981, 0.49999999831071545, 0.5000000009925557]
+
+# Die Subtraktion funktioniert, weil der unverschlüsselte prototype_vector 
+# intern von Bibliothek-TenSEAL automatisch in ein "plaintext polynomial" codiert wird.
+# Dabei wird das Array np.array([...]) mit derselben Skala (scale) und denselben 
+# Modulus-Parametern wie der CKKS-Vektor enc_vector kodiert.
+# Anschließend erfolgt die homomorphe Subtraktion direkt im Polynomring R_q[X]/(X^n + 1).
