@@ -7,7 +7,6 @@
 # Ergebnis: verschlüsselte und unverschlüsselte Distanzen sind identisch
 
 # === Bibliotheken importieren ===
-from ucimlrepo import fetch_ucirepo # Heart Disease Dataset
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn_lvq import GlvqModel
@@ -23,14 +22,14 @@ import tenseal as ts
 # ===  1. Dataset laden    ===
 # === === === === === ===  ===
 print("Lade Heart Disease Datensatz...")
-# Ruft den "Heart Disease" Datensatz (mit der ID 45) vom UCI Machine Learning Repository ab.
-heart_disease = fetch_ucirepo(id=45)
+# Lese den Heart Disease Datensatz lokal aus der Datei mit Leerzeichen als Trennzeichen
+df = pd.read_csv("heart_data_pretty.csv", delim_whitespace=True)
 
 # Extrahiert die Merkmalsdaten (Features) aus dem geladenen Objekt
-X = heart_disease.data.features.copy()
+X = df.drop(columns=["target"]).copy()
 
 # Extrahiert die Zielvariablen (Targets) aus dem geladenen Objekt.
-y = heart_disease.data.targets.copy()
+y = df["target"].copy()
 print("Datensatz geladen.")
 
 # === === === === === === === === ===
@@ -59,7 +58,7 @@ print(y_binary.value_counts())
 # === === === === === === ===
 # Merkmalsdaten (X) bereinigen und für das Modell vorbereiten
 print("\nStarte Vorverarbeitung...")
-# Ersetze fehlende Werte, die im Datensatz als '?' (Fragezeichen) kodiert sind, durch `np.nan`.
+# Ersetze fehlende Werte, die im Datensatz als '?' kodiert sind, durch `np.nan`.
 X.replace('?', np.nan, inplace=True)
 
 # Versuche alle Spalten des DataFrames `X` in numerische Werte umzuwandeln.
@@ -77,16 +76,14 @@ X_scaled = scaler.fit_transform(X)
 y_binary_np = y_binary.to_numpy()
 print("Vorverarbeitung abgeschlossen.")
 
-
 # === === === === === === === === === === === === ===
 # ===  4. Aufteilung in Trainings- und Testdaten   ===
 # === === === === === === === === === === === === ===
-# Teilen die Daten in 95% Trainingsdaten und 5% Testdaten.
+# Teilen die Daten in 95% Trainingsdaten und 5% Testdaten.  
 X_train, X_test, y_train, y_test = train_test_split(
     X_scaled, y_binary_np, test_size=0.05, random_state=42, stratify=y_binary_np
 )
 print(f"\nDaten aufgeteilt: {len(X_train)} Trainingspunkte, {len(X_test)} Testpunkte.")
-
 
 # === === === === === === === === === === ===
 # ===  5. SERVER-SEITE: Modell trainieren  ===
@@ -109,7 +106,6 @@ prototypes = server_model.w_
 proto_labels = server_model.c_w_
 print(f"-> Server-Modell ist trainiert und hat {len(prototypes)} Prototypen gelernt.")
 
-
 # === === === === === === === === === === === === ===
 # ===  6. CLIENT-SEITE: CKKS-Kontext erstellen     ===
 # === === === === === === === === === === === === ===
@@ -126,7 +122,6 @@ context.global_scale = 2**40
 context.generate_galois_keys()
 secret_key = context.secret_key()
 print("-> Client hat Kontext und Schlüsselpaar generiert.")
-
 
 # ####################################################################################
 # ###  BEGINN DER SCHLEIFE ZUM VERGLEICH VON VERSCHLÜSSELTER VS. UNVERSCHLÜSSELTER KLASSIFIKATION ###
@@ -150,22 +145,25 @@ for patient_index in range(len(X_test)):
     # A) VERSCHLÜSSELTE KLASSIFIKATION (CLIENT-SERVER-INTERAKTION)
     # ------------------------------------------------------------------
     print("\n--- A) Starte verschlüsselte Klassifikation ---")
-    # Client verschlüsselt den Vektor
+    # Client verschlüsselt den Vektor (Patientendaten)
     encrypted_patient_vector = ts.ckks_vector(context, user_patient_vector)
 
-    # Server berechnet homomorph die Distanzen
+    # Server berechnet homomorph die euklidischen Distanzen
     encrypted_distances = []
-    for p_vector in prototypes:
-        enc_diff = encrypted_patient_vector - p_vector
-        enc_squared_diff = enc_diff.pow_(2)
-        enc_distance = enc_squared_diff.sum()
+    for p_vector in prototypes: # for each Prototyp-Vektor im GLVQ-Modell
+        enc_diff = encrypted_patient_vector - p_vector 
+        enc_squared_diff = enc_diff.pow_(2) # Das entspricht (xi−pi)^2 pro Feature (Merkmal)
+        enc_distance = enc_squared_diff.sum() # Summieren die Distanzen aller 13 Vektoren-Features 
         encrypted_distances.append(enc_distance)
+        print("\n--- encrypted_patient_vector:", encrypted_patient_vector) # verschlüsselt
+        print("\n--- prototype vector:", p_vector) # !!! unverschlüsselt
+        print("\n--- Aktuelle quadrierte Differenz:", enc_squared_diff) # verschlüsselt
+        print("\n--- Aktuelle quadrierte Distanz Datenpunkt/Vektor:", enc_distance) # verschlüsselt
 
     # Client entschlüsselt die Distanzen und trifft die Entscheidung
     decrypted_distances = [d.decrypt(secret_key)[0] for d in encrypted_distances]
     winning_proto_encrypted_idx = np.argmin(decrypted_distances)
     pred_class_encrypted = proto_labels[winning_proto_encrypted_idx]
-
 
     # ------------------------------------------------------------------
     # B) UNVERSCHLÜSSELTE KLASSIFIKATION (KONTROLLEXPERIMENT)
@@ -178,7 +176,6 @@ for patient_index in range(len(X_test)):
     winning_proto_unencrypted_idx = np.argmin(unencrypted_distances)
     pred_class_unencrypted = proto_labels[winning_proto_unencrypted_idx]
 
-
     # ------------------------------------------------------------------
     # C) VERGLEICH DER ERGEBNISSE
     # ------------------------------------------------------------------
@@ -190,13 +187,11 @@ for patient_index in range(len(X_test)):
     print("Vorhersage    | {:^25} | {:^25}".format('KRANK' if pred_class_encrypted == 1 else 'GESUND', 'KRANK' if pred_class_unencrypted == 1 else 'GESUND'))
     print("----------------------------------------------------------------")
 
-
     if pred_class_encrypted == pred_class_unencrypted:
         print("✅ Klassifikationen stimmen überein!")
         classification_matches += 1
     else:
         print("❌ ACHTUNG: Klassifikationen weichen ab!")
-
 
 # === === === === === === === === === === === === ===
 # ===  7. FINALE AUSWERTUNG                       ===
@@ -208,3 +203,26 @@ print(f"Insgesamt wurden {len(X_test)} Patienten aus dem Test-Set klassifiziert.
 print(f"In {classification_matches} von {len(X_test)} Fällen stimmte die verschlüsselte Klassifikation mit der unverschlüsselten überein.")
 accuracy = (classification_matches / len(X_test)) * 100
 print(f"-> Übereinstimmungs-Genauigkeit: {accuracy:.2f}%")
+
+
+#######################################################################################################################################
+# Test zur Überprüfung, ob die Subtraktion eines CKKS-verschlüsselten Vektors mit einem unverschlüsselten Vektor in TenSEAL möglich ist
+# Bibliothek TenSEAL übernimmt die internen Konvertierungen automatisch (Plaintext → internal encoding)
+#######################################################################################################################################
+
+# Beispielwerte
+patient_vector = np.array([1.0, 2.0, 3.0])
+prototype_vector = np.array([0.5, 1.5, 2.5])
+
+
+# patient_vector Vektor verschlüsseln
+enc_vector = ts.ckks_vector(context, patient_vector)
+
+# Subtraktion (verschlüsselt - unverschlüsselt)
+enc_diff = enc_vector - prototype_vector
+
+# Ergebnis entschlüsseln
+decrypted_diff = enc_diff.decrypt()
+
+print("Erwartete Differenz:", patient_vector - prototype_vector) # Output: [0.5 0.5 0.5]
+print("Entschlüsselte Differenz:", decrypted_diff) # Output: [0.4999999999831981, 0.49999999831071545, 0.5000000009925557]
