@@ -223,7 +223,7 @@ plt.yticks(ticks=np.arange(len(class_names)) + 0.5, labels=class_names, rotation
 print("\nZeige Konfusionsmatrix an...")
 plt.show()
 
-
+'''
 # === === === === === === === === === === === === === === === ===
 # ===  8. VISUALISIERUNG DER GMLVQ RELEVANZ-MATRIX (OMEGA)    ===
 # === === === === === === === === === === === === === === === ===
@@ -231,14 +231,14 @@ print("\n\n================================================================")
 print("===    GMLVQ RELEVANZ-MATRIX (OMEGA) VISUALISIERUNG     ===")
 print("================================================================")
 
-# 1. Extrahiere die Relevanz-Matrix aus dem besten Modell
+# 1. Extrahiere die OMEGA Relevanz-Matrix aus dem besten Modell
 # Das korrekte Attribut heißt .omega_    // laut sklearn_lvq Dokumentation
-lambda_matrix = grid_search.best_estimator_.omega_
+omega_matrix = grid_search.best_estimator_.omega_
 
 # 2. Erstelle die Heatmap
 # Eine größere Figure-Size ist für die Lesbarkeit der Achsenbeschriftungen hilfreich
 plt.figure(figsize=(12, 10))
-sns.heatmap(lambda_matrix,
+sns.heatmap(omega_matrix,
             xticklabels=feature_names,
             yticklabels=feature_names,
             annot=False,  # Auf False gesetzt, da die Matrix sonst zu unübersichtlich wird
@@ -246,7 +246,7 @@ sns.heatmap(lambda_matrix,
             cmap='viridis') # 'viridis' ist  gute Farbpalette für Relevanz
 
 # 3. Füge Titel und Beschriftungen hinzu und optimiere die Darstellung
-plt.title('GMLVQ Relevanz-Matrix (Ω)', fontsize=16)
+plt.title('GMLVQ Relevanz-Matrix (Omega Ω)', fontsize=16)
 plt.xticks(rotation=45, ha="right") # Rotiert die x-Achsen-Beschriftung für bessere Lesbarkeit
 plt.yticks(rotation=0)
 plt.tight_layout() # Passt das Layout an, um Überschneidungen zu vermeiden
@@ -254,4 +254,37 @@ plt.tight_layout() # Passt das Layout an, um Überschneidungen zu vermeiden
 # 4. Zeige das Diagramm an
 print("\nZeige Relevanz-Matrix an...")
 print("Helle Felder auf der Diagonalen zeigen die wichtigsten Merkmale an.")
+plt.show()
+'''
+
+# === === === === === === === === === === === === === === === ===
+# ===  9. VISUALISIERUNG DER GMLVQ RELEVANZ-MATRIX (LAMBDA)    ===
+# === === === === === === === === === === === === === === === ===
+print("\n\n================================================================")
+print("===    GMLVQ RELEVANZ-MATRIX (LAMBDA) VISUALISIERUNG     ===")
+print("================================================================")
+
+# Extrahiere omega_ aus dem trainierten Modell
+omega = grid_search.best_estimator_.omega_
+
+# Berechne daraus die Lambda-Matrix (symmetrisch, positive semi-definit)
+lambda_matrix = np.dot(omega.T, omega)
+
+# Spaltennamen (Feature-Namen) verwenden
+xticklabels = feature_names
+yticklabels = feature_names
+
+# Visualisierung
+plt.figure(figsize=(12, 10))
+sns.heatmap(lambda_matrix,
+            xticklabels=xticklabels,
+            yticklabels=yticklabels,
+            annot=False,
+            fmt=".2f",
+            cmap='viridis')
+
+plt.title("GMLVQ Relevanzmatrix (LAMBDA  Λ = Ωᵀ·Ω)", fontsize=16)
+plt.xticks(rotation=45, ha="right")
+plt.yticks(rotation=0)
+plt.tight_layout()
 plt.show()
