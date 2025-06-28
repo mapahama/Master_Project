@@ -117,5 +117,6 @@ def process_encrypted_request(serialized_encrypted_patient_vector, serialized_pu
     for vec, label in zip(encrypted_distances, proto_labels):
         serialized_results.append((vec.serialize(), label))
 
+
     print("--- SERVER: Distanzberechnung abgeschlossen, sende Ergebnisse zurück. ---")
     return serialized_results
