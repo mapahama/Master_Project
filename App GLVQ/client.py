@@ -110,7 +110,7 @@ for i, feature in enumerate(feature_names):
 if st.sidebar.button("Klassifikation durchführen", type="primary"):
     
     # === Schritt 1: CLIENT - Daten aufbereiten und verschlüsseln ===
-    st.header("1. Client-Aktionen (auf Ihrem Gerät)")
+    st.header("1. Client-Aktionen")
     # Wandelt die Nutzereingaben in einen Pandas DataFrame um.
     patient_df = pd.DataFrame([user_input])
     st.write("**Aktion:** Rohdaten des Patienten werden gesammelt.")
@@ -173,11 +173,14 @@ if st.sidebar.button("Klassifikation durchführen", type="primary"):
     results_df = pd.DataFrame({
         "Prototyp-Klasse": ['GESUND' if l == 0 else 'KRANK' for l in labels],
         "Entschlüsselte Distanz (quadriert)": decrypted_distances
-    })
+    }, index=np.arange(1, len(labels) + 1)) 
+    
+    #Den Index benennen, damit er in der Tabelle einen Titel hat.
+    results_df.index.name = "Prototyp-Nr."
     
     # Definiere eine Funktion, um die Zeile mit der minimalen Distanz farblich hervorzuheben.
     def highlight_min(row):
-        return ['background-color: #636363'] * len(row) if row.name == min_dist_idx else [''] * len(row)
+        return ['background-color: #636363'] * len(row) if row.name == (min_dist_idx + 1) else [''] * len(row)
     # Zeige die formatierte Tabelle an.
     st.table(results_df.style.apply(highlight_min, axis=1))
 

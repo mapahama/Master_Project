@@ -41,7 +41,7 @@ def get_server_assets():
     """
     # --- Schritt 1: Daten laden und vorverarbeiten ---
     print("--- SERVER: Lade Datensatz für das einmalige Training... ---")
-    df = pd.read_csv("heart_data_pretty.csv", sep='\s+')
+    df = pd.read_csv("../heart_data_pretty.csv", sep='\s+')  # load dataset locally
     X = df.drop(columns=["target"]).copy()
     y = (df["target"] > 0).astype(int)
     # Feature-Namen extrahieren, damit der Client sie erhalten kann
@@ -103,7 +103,7 @@ def process_encrypted_request(serialized_encrypted_patient_vector, serialized_pu
     for p_vector in prototypes:
         enc_diff = encrypted_patient_vector - p_vector
         enc_squared_diff = enc_diff.pow(2)
-        enc_distance = enc_squared_diff.sum()
+        enc_distance = enc_squared_diff.sum() # dies ist die Quadrierte Euklidische Distanz // Alle 13 Merkmale innerhalb des Vektors "enc_squared_diff" werden zu einem einzigen Wert addiert.
         encrypted_distances.append(enc_distance)
 
         # Debug-Ausgaben, um den Prozess zu verfolgen. TODO: In Produktion zu entfernen.
