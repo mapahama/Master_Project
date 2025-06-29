@@ -27,6 +27,7 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 import tenseal as ts
 import time
+import plotly.express as px
 
 # --- Server-Kommunikation simulieren ---
 # Importiert die "API-Funktion" aus der server.py Datei.
@@ -110,6 +111,7 @@ for i, feature in enumerate(feature_names):
 if st.sidebar.button("Klassifikation durchführen", type="primary"):
     
     # === Schritt 1: CLIENT - Daten aufbereiten und verschlüsseln ===
+    st.divider()  # Abstand
     st.header("1. Client-Aktionen")
     # Wandelt die Nutzereingaben in einen Pandas DataFrame um.
     patient_df = pd.DataFrame([user_input])
@@ -126,6 +128,7 @@ if st.sidebar.button("Klassifikation durchführen", type="primary"):
     st.info("🔒 Die Patientendaten sind jetzt sicher und können das Gerät verlassen.")
 
     # === Schritt 2: CLIENT -> SERVER - Anfrage senden (simulierter API-Aufruf) ===
+    st.divider()  # Abstand
     st.header("2. Simulation der Interaktion")
     
     # Vorbereitung für den "Versand": Die komplexen Objekte müssen serialisiert (in Bytes umgewandelt) werden.
@@ -147,6 +150,7 @@ if st.sidebar.button("Klassifikation durchführen", type="primary"):
     st.write("📥 **Server an Client:** Sende Liste von (verschlüsselten Distanzen, Prototyp-Klassen).")
 
     # === Schritt 3: CLIENT - Antwort entschlüsseln und Ergebnis analysieren ===
+    st.divider()  # Abstand
     st.header("3. Ergebnis auf Client-Seite")
     st.write("**Aktion:** Client empfängt die verschlüsselten Ergebnisse und entschlüsselt sie mit seinem privaten Schlüssel.")
     
@@ -190,3 +194,61 @@ if st.sidebar.button("Klassifikation durchführen", type="primary"):
         st.error("Der Patient wird als **KRANK** eingestuft.", icon="💔")
     else:
         st.success("Der Patient wird als **GESUND** eingestuft.", icon="💚")
+
+
+    #################################
+    # Balkendiagramm  / Erklärbarkeit
+    #################################
+
+    # === Schritt 4: GRAFISCHE DARSTELLUNG DES ERGEBNISSES  ===
+    st.divider()  # Abstabd
+    st.subheader("📊 Grafischer Vergleich der Distanzen")
+    st.write(
+        "Jeder Balken repräsentiert einen Prototyp des Modells. "
+        "Die Klassifikation basiert auf dem Prototyp mit der kürzesten Distanz."
+    )
+
+    # Bereite die Daten für das Diagramm vor
+    plot_df = pd.DataFrame({
+        "Prototyp-Nr.": [f"Proto {i+1}" for i in range(len(labels))],
+        "Klasse": ["GESUND" if l == 0 else "KRANK" for l in labels],
+        "Quadrierte Distanz": decrypted_distances
+    })
+
+
+    # 4.1 Definiere alle möglichen Zustände und ihre Farben
+    color_map = {
+        'GESUND': 'mediumseagreen',
+        'KRANK': 'indianred',
+        'GEWINNER (GESUND)': 'darkgreen', # Dunkleres Grün für den Gewinner (Gesund)
+        'GEWINNER (KRANK)': 'darkred'    # Dunkleres Rot für den Gewinner (Krank)
+    }
+
+    # 4.2 Erstelle eine neue Spalte, die den Zustand für die Legende und Farbe steuert.
+    #    Fülle sie zuerst mit den Basis-Klassen ('GESUND' oder 'KRANK').
+    plot_df['Legenden-Kategorie'] = plot_df['Klasse']
+
+    # 4.3 Bestimme die spezielle Kategorie für den Gewinner-Prototyp
+    winning_class_label = plot_df.loc[min_dist_idx, 'Klasse']
+    winning_category = f'GEWINNER ({winning_class_label})'
+
+    # 4.4 Setze diese spezielle Kategorie für die Gewinner-Zeile im DataFrame.
+    #    Wir verwenden .loc mit dem Index-Wert, um die richtige Zeile zu ändern.
+    plot_df.loc[min_dist_idx, 'Legenden-Kategorie'] = winning_category
+
+    # Erstelle das Balkendiagramm mit Plotly, basierend auf der neuen Kategorie-Spalte.
+    fig = px.bar(
+        plot_df,
+        x="Prototyp-Nr.",
+        y="Quadrierte Distanz",
+        color='Legenden-Kategorie', 
+        color_discrete_map=color_map, # Weist  Farbpalette zu
+        title="Vergleich der Distanzen zu allen Prototypen"
+    )
+
+    fig.update_layout(legend_title_text='Status')
+    
+    # Zwinge die X-Achse, die Reihenfolge aus dem DataFrame beizubehalten
+    fig.update_xaxes(categoryorder='array', categoryarray=plot_df['Prototyp-Nr.'])
+    # Zeige die interaktive Grafik in Streamlit an
+    st.plotly_chart(fig, use_container_width=True)
