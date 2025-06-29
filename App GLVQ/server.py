@@ -2,6 +2,7 @@
 # =================================================================================
 # SERVER-SEITIGE LOGIK 
 # =================================================================================
+#
 # Dieser Code simuliert die serverseitige Komponente einer Client-Server-Anwendung.
 # Die Hauptaufgaben dieses Servers sind:
 # 1. Einmaliges Trainieren eines GLVQ-Machine-Learning-Modells, um "Prototypen"

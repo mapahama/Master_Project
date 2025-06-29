@@ -6,7 +6,7 @@
 # In der eigentlichen Client-Server-App werden Patientendaten auf dem Client mit CKKS verschlüsselt,
 # an den Server gesendet, und dort erfolgt die Distanzberechnung zu den GLVQ-Prototypen.
 # Die Klassifikation (gesund/krank) findet anschließend auf dem Client statt,
-# indem die verschlüsselten Distanzen entschlüsselt und verglichen werden.
+# indem die verschlüsselten Distanzen entschlüsselt und verglichen werden .
 #
 # Dieses Skript überprüft die Genauigkeit dieser Architektur, indem dieselben Patientendaten
 # in der Konsole eingegeben und **auf dem Server im Klartext verarbeitet** werden.
