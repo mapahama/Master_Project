@@ -26,6 +26,7 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 import tenseal as ts
 import time
+import altair as alt  # Säulendiagramm
 
 # --- Server-Kommunikation simulieren ---
 # Importiert die "API-Funktion" aus der server.py Datei.
@@ -64,10 +65,11 @@ def setup_client_environment():
 # ==============================================================================
 st.set_page_config(layout="wide", page_title="Privacy-Preserving GMLVQ")
 st.title("🩺 Privacy-Preserving Heart Disease Classification (GMLVQ)")
-st.write(
-    "Dies ist eine Simulation einer getrennten Client-Server-Architektur. "
-    "Der **Client** (diese UI) verschlüsselt die Daten. Der **Server** (eine separate Logik) "
-    "berechnet die Distanzen, ohne die Daten oder das Ergebnis zu kennen."
+st.markdown(
+    '<p style="color:#a7a1a1;">Dies ist eine Simulation einer getrennten Client-Server-Architektur. '
+    'Der <b>Client</b> (diese UI) verschlüsselt die Daten. Der <b>Server</b> (eine separate Logik) '
+    'berechnet die Distanzen, ohne die Daten oder das Ergebnis zu kennen.</p>',
+    unsafe_allow_html=True
 )
 
 try:
@@ -91,14 +93,14 @@ if st.sidebar.button("Klassifikation durchführen", type="primary"):
     # === Schritt 1: CLIENT - Daten aufbereiten und verschlüsseln ===
     st.header("1. Client-Aktionen")
     patient_df = pd.DataFrame([user_input])
-    st.write("**Aktion:** Rohdaten des Patienten werden gesammelt.")
+    st.markdown('<p style="color:#a7a1a1;"><b>Aktion:</b> Rohdaten des Patienten werden gesammelt.</p>', unsafe_allow_html=True)
     st.dataframe(patient_df)
 
     scaled_patient_vector = scaler.transform(patient_df)[0]
-    st.write("**Aktion:** Daten werden normiert, um für das Modell kompatibel zu sein.")
+    st.markdown('<p style="color:#a7a1a1;"><b>Aktion:</b> Daten werden normiert, um für das Modell kompatibel zu sein.</p>', unsafe_allow_html=True)
     
     encrypted_patient_vector = ts.ckks_vector(context, scaled_patient_vector)
-    st.write("**Aktion:** Normierte Daten werden homomorph verschlüsselt.")
+    st.markdown('<p style="color:#a7a1a1;"><b>Aktion:</b> Normierte Daten werden homomorph verschlüsselt.</p>', unsafe_allow_html=True)
     st.info("🔒 Die Patientendaten sind jetzt sicher und können das Gerät verlassen.")
 
     # === Schritt 2: CLIENT -> SERVER - Anfrage senden (simulierter API-Aufruf) ===
@@ -117,13 +119,16 @@ if st.sidebar.button("Klassifikation durchführen", type="primary"):
         # 2. Die Klartext-Relevanzen für die Erklärbarkeit (wird als Säulendiagramm angezeigt)
         serialized_results_from_server, relevances = process_encrypted_request(serialized_patient_vector, serialized_public_ckks_context)
     
-    st.write("📤 **Client an Server:** Sende verschlüsselten Datenvektor und öffentlichen Kontext.")
-    st.write("... Server arbeitet blind auf den Daten ...")
-    st.write("📥 **Server an Client:** Sende Liste von (verschlüsselten Distanzen, Klassen) UND die Merkmals-Relevanzen.")
+    st.markdown('<p style="color:#a7a1a1;">📤 <b>Client an Server:</b> Sende verschlüsselten Datenvektor und öffentlichen Kontext.</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color:#a7a1a1;">... Server arbeitet blind auf den Daten ...</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color:#a7a1a1;">📥 <b>Server an Client:</b> Sende Liste von (verschlüsselten Distanzen, Klassen) UND die Merkmals-Relevanzen.</p>', unsafe_allow_html=True)
 
     # === Schritt 3: CLIENT - Antwort entschlüsseln und Ergebnis analysieren ===
     st.header("3. Ergebnis auf Client-Seite")
-    st.write("**Aktion:** Client empfängt die Liste und entschlüsselt die Distanzen mit seinem privaten Schlüssel.")
+    st.markdown(
+        '<p style="color:#a7a1a1;"><b>Aktion:</b> Client empfängt die Liste und entschlüsselt die Distanzen mit seinem privaten Schlüssel.</p>',
+        unsafe_allow_html=True
+    )
     
     secret_key = context.secret_key()
     decrypted_distances = []
@@ -153,26 +158,38 @@ if st.sidebar.button("Klassifikation durchführen", type="primary"):
     else:
         st.success("Der Patient wird als **GESUND** eingestuft.", icon="💚")
 
-
+    
     # ==============================================================================
-    # Schritt 4 - ERKLÄRBARKEIT DES GMLVQ MODELLS
+    # Schritt 4 - ERKLÄRBARKEIT DES GMLVQ MODELLS 
     # ==============================================================================
     st.divider()
     st.subheader("💡 Erklärbarkeit des GMLVQ-Modells")
-    st.write(
-        "GMLVQ lernt welche Merkmale für die Klassifikation wichtig sind. "
-        "Das folgende Diagramm zeigt die vom Modell gelernte Wichtigkeit (Relevanz) für jedes Merkmal. "
-        "Hohe Balken bedeuten, dass das Merkmal einen großen Einfluss auf das Ergebnis hat."
+    st.markdown(
+        '<p style="color:#a7a1a1;">GMLVQ lernt, welche Merkmale für die Klassifikation wichtig sind. '
+        'Das folgende Diagramm zeigt die vom Modell gelernte Wichtigkeit (Relevanz) für jedes Merkmal. '
+        'Hohe Balken bedeuten, dass das Merkmal einen großen Einfluss auf das Klassifikations-Ergebnis hat.</p>',
+        unsafe_allow_html=True
     )
 
-    # Bereite die empfangenen Relevanz-Daten für das Diagramm vor
+    # 1. Bereite die empfangenen Relevanz-Daten für das Diagramm vor
     relevance_df = pd.DataFrame({
         "Merkmal": feature_names,
-        "Relevanz": relevances  # das sind die Diagonal-Werte aus der Lambda-Matrix
+        "Relevanz": relevances # Diagonal-Werte aus der Lambda-Matrix
     })
 
-    # Sortiere den DataFrame, um die wichtigsten Merkmale oben anzuzeigen
+    # 2. Sortiere den DataFrame, um die wichtigsten Merkmale zuerst anzuzeigen
     relevance_df = relevance_df.sort_values(by="Relevanz", ascending=False)
 
-    # Stelle die Relevanzen als Balkendiagramm dar
-    st.bar_chart(relevance_df.set_index("Merkmal"))
+    # 3. Erstelle das Diagramm mit Altair-Bibliothek
+    chart = alt.Chart(relevance_df).mark_bar().encode(
+        x=alt.X('Merkmal', sort=None, title="Merkmal"),
+        y=alt.Y('Relevanz', title="Relevanz")
+    ).properties(
+        title='Wichtigkeit der Merkmale'
+    ).configure_title(
+        color='rgb(75, 104, 159)', 
+        fontSize=16    
+    )
+
+    # 4. Zeige das Diagramm in der Streamlit-App an
+    st.altair_chart(chart, use_container_width=True)
