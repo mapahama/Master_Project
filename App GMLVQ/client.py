@@ -193,3 +193,5 @@ if st.sidebar.button("Klassifikation durchführen", type="primary"):
 
     # 4. Zeige das Diagramm in der Streamlit-App an
     st.altair_chart(chart, use_container_width=True)
+
+    # TODO: PDF-Bericht
