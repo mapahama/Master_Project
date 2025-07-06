@@ -1,3 +1,5 @@
+
+###############################################################################################################################
 # .\venv311\Scripts\activate
 
 # ============================================================================================
@@ -32,7 +34,7 @@
 #     - Die Differenz der verschlüsselten Werte wird berechnet.
 #     - Das angenäherte Signum-Polynom wird auf dieser verschlüsselten Differenz
 #       ausgewertet (`.polyval`).
-#     - Das Ergebnis wird entschlüsselt und die Genauigkeit der Vorhersage
+#     - Das Ergebnis wird entschlüsselt (zur Demonstration, in Produktion keine Entschlüssekung) und die Genauigkeit der Vorhersage
 #       (war das Vorzeichen korrekt?) wird überprüft.
 #
 # --- KERNKONFLIKT ---
@@ -44,15 +46,16 @@
 #
 # ============================================================================================
 
-
-
 import tenseal as ts
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import time
 
+# ================================================================
 # 1. Tschebyscheff-Approximation der Signumfunktion
-CHEBYSHEV_DEGREE = 10 # Grad des Tschebyscheff-Polynoms. Ein höherer Grad -> genauere Approximation, erhöht aber auch Rauschen in CKKS
+# ================================================================
+CHEBYSHEV_DEGREE = 9 # Grad des Tschebyscheff-Polynoms. Ein höherer Grad -> genauere Approximation, erhöht aber auch Rauschen in CKKS
 x_vals = np.linspace(-1, 1, 2000) # Erstellt ein Array von 2000 gleichmäßig verteilten Zahlen im Intervall von -1 bis +1
 
 sign_vals = np.sign(x_vals) #  Berechnet Signumfunktion (Vorzeichenfunktion) für jeden Wert in x_vals
@@ -64,41 +67,39 @@ sign_vals = np.sign(x_vals) #  Berechnet Signumfunktion (Vorzeichenfunktion) fü
 #  das die durch x_vals und sign_vals gegebenen Punkte beschreibt.
 cheb_poly = np.polynomial.chebyshev.Chebyshev.fit(x_vals, sign_vals, CHEBYSHEV_DEGREE) # das gefundene Tschebyscheff Polynom
 monomial_coeffs = cheb_poly.convert(kind=np.polynomial.Polynomial).coef #konvertiert das  gefundene Tschebyscheff-Polynom (cheb_poly) in  Standardform und extrahiert  Koeffizienten (.coef).
-
+print("monomial_coeffs: ", monomial_coeffs)
 
 # ================================================================
-# ANZEIGE DES POLYNOMS
+# 2. Anzeige des Polynoms & Visualisierung der Approximation in einem Diagramm
 # ================================================================
-print("--- Approximierendes Polynom (gerundet) ---")
 
 # Erzeugt ein neues Polynom-Objekt in der Standard-Basis zur Anzeige
 standard_poly = cheb_poly.convert(kind=np.polynomial.Polynomial)
 # Gibt das Polynom in einer lesbaren Form auf der Konsole aus 
 print(standard_poly)
 print("\n")
-# ================================================================
 
-
-# 2. Visualisierung der Approximation in einem Diagramm
+# Visualisierung in einem Diagramm
 plt.figure(figsize=(10, 6))
 plt.plot(x_vals, sign_vals, "--", label="sign(x)") # Zeichnet die originale Signumfunktion
 plt.plot(x_vals, cheb_poly(x_vals), label=f"Chebyshev Approx (deg={CHEBYSHEV_DEGREE})") # Zeichnet unser approximiertes Polynom
 plt.legend(); plt.title("Tschebyscheff-Approximation der Signumfunktion"); plt.grid(True)
 plt.ylim(-1.5, 1.5); plt.show()
 
-
+# ================================================================
 # 3. CKKS-Kontext initialisieren
+# ================================================================
 context = ts.context(
     ts.SCHEME_TYPE.CKKS,
     # "poly_modulus_degre" definiert die Größe der Polynomringe, in denen gerechnet wird. 
     #    Ein größerer Wert bedeutet mehr Sicherheit und mehr Kapazität für Rauschen, aber auch langsamere Berechnungen.
     #    Ein niedrigerer Wert bedeutet schnellere aber ungenauere Berechnungen
-    poly_modulus_degree= 16384, # 32768   # für Polynomgrad 10
+    poly_modulus_degree= 32768, #  16384  # für Polynomgrad 23
     # "coeff_mod_bit_sizes"  ist Parameter für das "Rauschbudget" - Multiplikationstiefe
     #    Jede Multiplikation auf verschlüsselten Daten "verbraucht" einen der mittleren Moduln (hier die 40er).
     #    Die Anzahl dieser mittleren Moduln  bestimmt die multiplikative Tiefe – 
     #    also wie viele Multiplikationen hintereinander ausgeführt werden können
-    coeff_mod_bit_sizes= [60, 40, 40, 40, 40, 60]   # [60, 40, 40, 40, 40, 40, 40, 60]  - multiplikationstiefe hängt von dem Polynomgrad ab
+    coeff_mod_bit_sizes= [60, 40, 40, 40, 40, 40, 40, 40, 60]  #  - multiplikationstiefe hängt von dem Polynomgrad ab und Anzahl Multiplikationen in den Berechnungen
 )
 context.generate_galois_keys() #  ermöglichen "Rotationen" (Drehungen) von verschlüsselten Vektoren. (z.B. für Multiplikation, Summieren)
 # "context.global_scale" - CKKS kann nicht direkt mit Dezimalzahlen (wie 5.1) rechnen, sondern nur mit ganzen Zahlen.
@@ -106,18 +107,18 @@ context.generate_galois_keys() #  ermöglichen "Rotationen" (Drehungen) von vers
 #    global_scale bestimmt, wie stark skaliert wird.
 context.global_scale = 2 ** 40 
 
-##################################################################
-#  Test durchführen
+# ================================================================
+#  4. Test durchführen - Vergleich: festgelegter Wert vs. deterministische Testwerte
 #
 #  Wir verschlüsseln Werte, führen die Berechnung (sign(val - ref)) homomorph durch und 
-#  entschlüsseln das Ergebnis, um die Genauigkeit zu überprüfen.
+#  entschlüsseln das Ergebnis, um die Genauigkeit zu evaluieren.
 #
-###################################################################
+# ================================================================
 
-# 4. Vergleich: festgelegter Wert vs. deterministische Testwerte
 reference = 0.5 # Der Referenzwert, mit dem wir vergleichen wollen.    z.B.   ob   0.5 > 1
 test_values = np.linspace(-1, 1, 100) # Eine neue Reihe von 100 Testwerten im Intervall [-1;1], um unsere Methode zu evaluieren.
 
+start_time = time.time()
 results = []
 for val in test_values:
     # Schritt 1: Verschlüsselung des Testwerts
@@ -131,7 +132,7 @@ for val in test_values:
     # auf dem verschlüsselten Wert enc_diff aus. Hier kann das Rauschen waschen.
     enc_sign_approx = enc_diff.polyval(monomial_coeffs)
 
-    # Schritt 4: Entschlüsselung (zur Evaluation)
+    # Schritt 4: Entschlüsselung (zur Evaluation)   # Nur zum Testen, in Produktion - keine Entschlüsselung !
     decrypted_result = enc_sign_approx.decrypt()[0]
 
     # Schritt 5: Auswertung – war das Vorzeichen korrekt?
@@ -145,19 +146,20 @@ for val in test_values:
         "Korrekt?": predicted == expected
     })
 
-# 5. Analyse der Ergebnisse
+# Ergebnisse auf der Konsole ausgeben
 df = pd.DataFrame(results)
 accuracy = df["Korrekt?"].mean() * 100
 
 print("\n--- Auswertung der homomorphen Vergleichsapproximation ---")
 print(df.to_string(index=False))
 print(f"\nTrefferquote: {accuracy:.2f}% bei Tschebyscheff-Grad {CHEBYSHEV_DEGREE}")
+print(f"Berechnungszeit: {time.time() - start_time:.2f} Sekunden")
 # Solange das Vorzeichen nach der sign-function  korrekt ist (negativ für val < 0.5 und positiv für val > 0.5), ist die Vorhersage richtig. 
 
 
-############################################
-#   Ergebnisse
-############################################
+# ================================================================
+# 5. Analyse der Ergebnisse
+# ================================================================
 
 #   Polynomgrad 7                                   <-
 #   context.global_scale = 2 ** 40
@@ -173,49 +175,56 @@ print(f"\nTrefferquote: {accuracy:.2f}% bei Tschebyscheff-Grad {CHEBYSHEV_DEGREE
 #
 # Ergebnis: Genauigkeit 77%      Geschwindigkeit: 17 sec  (Vergleich von 100 Werten)
 
-#   Polynomgrad 10                                   <-
+#   Polynomgrad 9                                  <-
 #   context.global_scale = 2 ** 20                   <-
 #   coeff_mod_bit_sizes=[60, 40, 40, 40, 40, 60]
 #   poly_modulus_degree=32768  
 #
 # Ergebnis: Genauigkeit 45%     Geschwindigkeit: 16 sec  (Vergleich von 100 Werten)
 
-#   Polynomgrad 10 
+#   Polynomgrad 9 
 #   context.global_scale = 2 ** 40                   <-
 #   coeff_mod_bit_sizes=[60, 40, 40, 40, 40, 60]
 #   poly_modulus_degree=32768
 #
 # Ergebnis: Genauigkeit 100%   Geschwindigkeit: 24 sec  (Vergleich von 100 Werten)
 
-#   Polynomgrad 10 
+#   Polynomgrad 9
 #   context.global_scale = 2 ** 40
 #   coeff_mod_bit_sizes=[60, 40, 40, 40, 40, 60]
 #   poly_modulus_degree=16384                         <-
 #
 # Ergebnis: Genauigkeit 100%   Geschindigkeit: 25 sec  (Vergleich von 100 Werten)
 
-#   Polynomgrad 10 
+#   Polynomgrad 9
+#   context.global_scale = 2 ** 40
+#   coeff_mod_bit_sizes=[60, 40, 40, 40, 40, 40, 60]  <-  mehr Multipl.Tiefe wenn mehrere Multiplikationen notwendig sind
+#   poly_modulus_degree=16384                         
+#
+# Ergebnis: Genauigkeit 100%   Geschindigkeit: 41 sec  (Vergleich von 100 Werten)
+
+#   Polynomgrad 9
 #   context.global_scale = 2 ** 40
 #   coeff_mod_bit_sizes=[60, 40, 40, 40, 60]          <-
 #   poly_modulus_degree=16384                         
 #
 # Ergebnis: Error: Scale out of bounds (wegen nicht ausreichende Multiplikationstiefe)
 
-#   Polynomgrad 15                                    <-
+#   Polynomgrad 11                                   <-
 #   context.global_scale = 2 ** 40
 #   coeff_mod_bit_sizes=[60, 40, 40, 40, 40, 60]
 #   poly_modulus_degree=16384   
 #
 # Ergebnis: Genauigkeit 76%    Geschwindigkeit: 38 sec  (Vergleich von 100 Werten)
 
-#   Polynomgrad 15                                    
+#   Polynomgrad 11                                    
 #   context.global_scale = 2 ** 40
 #   coeff_mod_bit_sizes=[60, 40, 40, 40, 40, 60]
 #   poly_modulus_degree=32768                          <-
 #
 # Ergebnis: Genauigkeit 76%      Geschwindigkeit: 43 sec  (Vergleich von 100 Werten)
 
-#   Polynomgrad 15                                    
+#   Polynomgrad 11                                    
 #   context.global_scale = 2 ** 40
 #   coeff_mod_bit_sizes=[60, 40, 40, 40, 40, 40, 40, 60]  <-
 #   poly_modulus_degree=32768                          
