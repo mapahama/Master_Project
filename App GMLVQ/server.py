@@ -55,7 +55,7 @@ def get_server_assets():
 
     # --- Schritt 3: GMLVQ-Modelltraining ---
     print("--- SERVER: Trainiere GMLVQ-Modell... ---")
-    gmlvq = GmlvqModel(prototypes_per_class=3, regularization=0.35, random_state=42) # Params wurden durch Kreuzvalidierung ausgewählt
+    gmlvq = GmlvqModel(prototypes_per_class=2, regularization=0.35, random_state=42) # Params wurden durch Kreuzvalidierung ausgewählt
     gmlvq.fit(X_scaled, y_binary_np)
 
     # --- Schritt 4: Relevante Modell-Parameter extrahieren ---
