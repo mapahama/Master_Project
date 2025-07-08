@@ -39,7 +39,7 @@ import time
 ################ Start Polynom ####################
 
 # 1. Tschebyscheff-Approximation der Signumfunktion
-CHEBYSHEV_DEGREE = 5 # Grad des Tschebyscheff-Polynoms. Ein höherer Grad -> genauere Approximation, erhöht aber auch Multiplikationstiefe, Rauschen und Berechnungszeit in CKKS
+CHEBYSHEV_DEGREE = 7 # Grad des Tschebyscheff-Polynoms. Ein höherer Grad -> genauere Approximation, erhöht aber auch Multiplikationstiefe, Rauschen und Berechnungszeit in CKKS
 x_vals = np.linspace(-1, 1, 2000) # Erstellt ein Array von 2000 gleichmäßig verteilten Zahlen im Intervall von -1 bis +1
 
 sign_vals = np.sign(x_vals) #  Berechnet Signumfunktion (Vorzeichenfunktion) für jeden Wert in x_vals
