@@ -50,10 +50,10 @@ def setup_client_environment():
     print("--- CLIENT: Generiere CKKS-Kontext und Schlüsselpaar... ---")
     context = ts.context(
         ts.SCHEME_TYPE.CKKS,
-        poly_modulus_degree=8192,
-        coeff_mod_bit_sizes=[60, 40, 40, 60]
+        poly_modulus_degree= 8192,  #32768  sehr lange Berechnungszeit (sogar wenn die Features anstatt 13 nur 2 sind)
+        coeff_mod_bit_sizes= [60, 30, 30, 60]  # [60] + [40]*12 + [60]  sehr lange Berechnungszeit (sogar wenn die Features anstatt 13 nur 2 sind)
     )
-    context.global_scale = 2**40
+    context.global_scale = 2**30 # wenn unter 20 -> Error: failed to find enough qualifying primes
     context.generate_galois_keys()
 
     print("--- CLIENT: Umgebung initialisiert. ---")
