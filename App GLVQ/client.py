@@ -136,7 +136,9 @@ if st.sidebar.button("Klassifikation durchführen", type="primary"):
     
     # Erstelle eine öffentliche Kopie des Kontexts, die sicher an den Server gesendet werden kann.
     context_for_server = context.copy()
-    context_for_server.make_context_public() # WICHTIG: Entfernt den geheimen Schlüssel aus der Kopie!
+        # Wir erstellen einen öffentlichen Kontext, der die riesigen Galois-Schlüssel NICHT enthält.
+        # Das macht die Serialisierung und den Transfer wesentlich schneller. // mit Galois Keys stürzt die App ab
+    context_for_server.make_context_public(generate_galois_keys=False) # Private Key und Galois keys entfernen!!!
     serialized_public_ckks_context = context_for_server.serialize()
 
     # Simuliere den API-Aufruf und die Wartezeit auf eine Antwort.
