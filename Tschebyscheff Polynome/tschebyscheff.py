@@ -58,7 +58,7 @@ import time
 # 1. Tschebyscheff-Approximation der Signumfunktion
 # ================================================================
 CHEBYSHEV_DEGREE = 7 # Grad des Tschebyscheff-Polynoms. Ein höherer Grad -> genauere Approximation, erhöht aber auch Rauschen in CKKS
-x_vals = np.linspace(-2, 2, 6000) # Erstellt ein Array von 2000 gleichmäßig verteilten Zahlen im Intervall von -1 bis +1
+x_vals = np.linspace(-1, 1, 2000) # Erstellt ein Array von 2000 gleichmäßig verteilten Zahlen im Intervall von -1 bis +1
 
 sign_vals = np.sign(x_vals) #  Berechnet Signumfunktion (Vorzeichenfunktion) für jeden Wert in x_vals
                             #. Es wird ausgegeben: für negative x-Werte -1, für positive x-Werte +1 und für x=0 den Wert 0 
@@ -136,7 +136,7 @@ for val in test_values:
     # tested:
     # monomial_coeffs = [0, 3.4375, 0, -4.6875, 0, 2.8125, 0, -0.5625] # grad 7 
     # monomial_coeffs = [0, 1.5708, 0, -0.6459, 0,  0.0796, 0, -0.0046] # grad 7 
-    monomial_coeffs = [0, 5.38063021, 0, -1.97093792, 0, 3.07160644, 0, -1.56558738] # <-- Höhste Treffquote Grad 7
+    # monomial_coeffs = [0, 5.38063021, 0, -1.97093792, 0, 3.07160644, 0, -1.56558738] # <-- Höhste Treffquote Grad 7
 
     # monomial_coeffs = [0, 1.5708,  0, -0.6704, 0, 0.1346, 0, -0.0125, 0, 0.0005] # grad 9
     # monomial_coeffs = [0, 4.375, 0, -8.203125, 0, 8.4375, 0, -3.9375, 0, 0.6875] # grad 9
@@ -246,7 +246,9 @@ print(f"Berechnungszeit: {time.time() - start_time:.2f} Sekunden")
 
 
 ######################################## Fazit #######################################
-# Das beste gefundene Polynom für sign Approximation:  [0, 5.38063021, 0, -1.97093792, 0, 3.07160644, 0, -1.56558738]     - Grad 7
+# Das beste gefundene Polynom zur Bestimmung des Vorzeichens durch approximierte  sign Funktion:  
+#  [0, 5.38063021, 0, -1.97093792, 0, 3.07160644, 0, -1.56558738]     - Grad 7
+#
 # Ergebnisse:
 # Reference --- Treffquote:    (Reference ist die Zahl, die wir mit einer Reihe von Zahlen im Interval [-1,1] vergöeichen - ob größer oder kleiner)
 #   (-0.9   ---  78%)    (-0.25  --- 100% )   (-0.5 --- 97% )   (0  --- 100%)   (0.25 --- 100%)    (0.5  --- 97%)    (0.9   ---  78%)    
