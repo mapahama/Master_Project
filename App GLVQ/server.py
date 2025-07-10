@@ -57,7 +57,7 @@ def get_server_assets():
     y_binary_np = y.to_numpy()
 
     print("--- SERVER: Trainiere GLVQ-Modell... ---")
-    server_model = GlvqModel(prototypes_per_class=3, beta=2, random_state=42)
+    server_model = GlvqModel(prototypes_per_class=3, beta=2, gtol=1e-5, random_state=42)
     server_model.fit(X_scaled, y_binary_np)
     
     prototypes = server_model.w_
