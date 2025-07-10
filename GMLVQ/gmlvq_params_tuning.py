@@ -6,6 +6,7 @@
 # Parameters:
 # 1. Prototypen pro Klasse
 # 2. Regularization-Parameter
+# 3. Gradient Toleranz (gtol)
 #
 # Dataset splits (Training / Testing):
 # 1. 80/20  (voreingestellt)
@@ -124,12 +125,14 @@ print(f"\nDaten aufgeteilt: {len(X_train_cv)} Proben für Kreuzvalidierung und {
 # === === === === === === === === === === === === === === === === === === === === ===
 # ===  4. Hyperparameter-Tuning mit GridSearchCV für GMLVQ                       ===
 # === === === === === === === === === === === === === === === === === === === === ===
-print("\n--- STARTE GridSearchCV: Tuning von 'prototypes_per_class' und 'regularization' ---")
+print("\n--- STARTE GridSearchCV: Tuning von 'prototypes_per_class' , 'regularization' , 'gtol' ---")
 
 # 1. Definiere das Gitter der zu testenden Parameter
 param_grid = {
     'prototypes_per_class': [1, 2, 3, 4, 5],
-    'regularization': np.arange(0.0, 0.5, 0.05).tolist() # [0.0, 0.05, 0.1, ..., 0.45]
+    'regularization': np.arange(0.0, 0.5, 0.05).tolist(), # Hilft Overfitting der Relevanzmatrix zu verhindern
+    'gtol': [1e-4, 1e-5, 1e-6]  # Das Training stoppt, wenn die Norm des Gradienten unter diesen Wert fällt. 
+                                # Ein kleinerer Wert führt zu einer längeren, aber potenziell genaueren Konvergenz.
 }
 
 # 2. Definiere die Kreuzvalidierungs-Strategie
@@ -288,3 +291,7 @@ plt.xticks(rotation=45, ha="right")
 plt.yticks(rotation=0)
 plt.tight_layout()
 plt.show()
+
+
+# Ergebnisse:  {'gtol': 1e-05, 'prototypes_per_class': 2, 'regularization': 0.35000000000000003}
+# Accuracy:      89.2 %
