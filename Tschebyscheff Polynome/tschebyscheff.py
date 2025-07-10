@@ -52,11 +52,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import time
 
+
+
 # ================================================================
 # 1. Tschebyscheff-Approximation der Signumfunktion
 # ================================================================
-CHEBYSHEV_DEGREE = 9 # Grad des Tschebyscheff-Polynoms. Ein höherer Grad -> genauere Approximation, erhöht aber auch Rauschen in CKKS
-x_vals = np.linspace(-1, 1, 2000) # Erstellt ein Array von 2000 gleichmäßig verteilten Zahlen im Intervall von -1 bis +1
+CHEBYSHEV_DEGREE = 7 # Grad des Tschebyscheff-Polynoms. Ein höherer Grad -> genauere Approximation, erhöht aber auch Rauschen in CKKS
+x_vals = np.linspace(-2, 2, 6000) # Erstellt ein Array von 2000 gleichmäßig verteilten Zahlen im Intervall von -1 bis +1
 
 sign_vals = np.sign(x_vals) #  Berechnet Signumfunktion (Vorzeichenfunktion) für jeden Wert in x_vals
                             #. Es wird ausgegeben: für negative x-Werte -1, für positive x-Werte +1 und für x=0 den Wert 0 
@@ -66,7 +68,7 @@ sign_vals = np.sign(x_vals) #  Berechnet Signumfunktion (Vorzeichenfunktion) fü
 # Die Methode (Chebyshev.fit) findet das bestmögliche Polynom vom Grad CHEBYSHEV_DEGREE,
 #  das die durch x_vals und sign_vals gegebenen Punkte beschreibt.
 cheb_poly = np.polynomial.chebyshev.Chebyshev.fit(x_vals, sign_vals, CHEBYSHEV_DEGREE) # das gefundene Tschebyscheff Polynom
-monomial_coeffs = cheb_poly.convert(kind=np.polynomial.Polynomial).coef #konvertiert das  gefundene Tschebyscheff-Polynom (cheb_poly) in  Standardform und extrahiert  Koeffizienten (.coef).
+monomial_coeffs = cheb_poly.convert(kind=np.polynomial.Polynomial).coef #konvertiert das  gefundene Tschebyscheff-Polynom (cheb_poly) in  Standardform und extrahiert  Koeffizienten (.coef)
 print("monomial_coeffs: ", monomial_coeffs)
 
 # ================================================================
@@ -76,7 +78,7 @@ print("monomial_coeffs: ", monomial_coeffs)
 # Erzeugt ein neues Polynom-Objekt in der Standard-Basis zur Anzeige
 standard_poly = cheb_poly.convert(kind=np.polynomial.Polynomial)
 # Gibt das Polynom in einer lesbaren Form auf der Konsole aus 
-print(standard_poly)
+print("standard_poly: ", standard_poly)
 print("\n")
 
 # Visualisierung in einem Diagramm
@@ -130,6 +132,15 @@ for val in test_values:
     # Schritt 3: Anwendung des Signum-Approximationspolynoms auf die Differenz
     # Die .polyval()-Methode wertet unser zuvor berechnetes Polynom (gegeben durch monomial_coeffs) 
     # auf dem verschlüsselten Wert enc_diff aus. Hier kann das Rauschen waschen.
+
+    # tested:
+    # monomial_coeffs = [0, 3.4375, 0, -4.6875, 0, 2.8125, 0, -0.5625] # grad 7 
+    # monomial_coeffs = [0, 1.5708, 0, -0.6459, 0,  0.0796, 0, -0.0046] # grad 7 
+    monomial_coeffs = [0, 5.38063021, 0, -1.97093792, 0, 3.07160644, 0, -1.56558738] # <-- Höhste Treffquote Grad 7
+
+    # monomial_coeffs = [0, 1.5708,  0, -0.6704, 0, 0.1346, 0, -0.0125, 0, 0.0005] # grad 9
+    # monomial_coeffs = [0, 4.375, 0, -8.203125, 0, 8.4375, 0, -3.9375, 0, 0.6875] # grad 9
+    # monomial_coeffs = [1.92753281, 3.32927197, -2.04970584, -4.80418856, 1.88666005,  3.23961423, -5.34773567, -9.35694607, 4.92353972,  9.59289761] # grad 9
     enc_sign_approx = enc_diff.polyval(monomial_coeffs)
 
     # Schritt 4: Entschlüsselung (zur Evaluation)   # Nur zum Testen, in Produktion - keine Entschlüsselung !
@@ -230,3 +241,12 @@ print(f"Berechnungszeit: {time.time() - start_time:.2f} Sekunden")
 #   poly_modulus_degree=32768                          
 #
 # Ergebnis: Genauigkeit 76%      Geschwindigkeit: 74 sec  (Vergleich von 100 Werten)
+
+
+
+
+######################################## Fazit #######################################
+# Das beste gefundene Polynom für sign Approximation:  [0, 5.38063021, 0, -1.97093792, 0, 3.07160644, 0, -1.56558738]     - Grad 7
+# Ergebnisse:
+# Reference --- Treffquote:    (Reference ist die Zahl, die wir mit einer Reihe von Zahlen im Interval [-1,1] vergöeichen - ob größer oder kleiner)
+#   (-0.9   ---  78%)    (-0.25  --- 100% )   (-0.5 --- 97% )   (0  --- 100%)   (0.25 --- 100%)    (0.5  --- 97%)    (0.9   ---  78%)    
