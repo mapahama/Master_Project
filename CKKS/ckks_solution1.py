@@ -23,7 +23,7 @@ import tenseal as ts
 # === === === === === ===  ===
 print("Lade Heart Disease Datensatz...")
 # Lese den Heart Disease Datensatz lokal aus der Datei mit Leerzeichen als Trennzeichen
-df = pd.read_csv("heart_data_pretty.csv", delim_whitespace=True)
+df = pd.read_csv("../heart_data_pretty.csv", delim_whitespace=True)
 
 # Extrahiert die Merkmalsdaten (Features) aus dem geladenen Objekt
 X = df.drop(columns=["target"]).copy()
@@ -224,8 +224,10 @@ enc_diff = enc_vector - prototype_vector
 # Ergebnis entschlüsseln
 decrypted_diff = enc_diff.decrypt()
 
-print("Erwartete Differenz:", patient_vector - prototype_vector) # Output: [0.5 0.5 0.5]
 print("Entschlüsselte Differenz:", decrypted_diff) # Output: [0.4999999999831981, 0.49999999831071545, 0.5000000009925557]
+print("plain_prototype  type: ", type(prototype_vector)) # Output: <class 'numpy.ndarray'>  - ist nicht verschlüsselt
+print("plain_prototype: ", (prototype_vector))  # Output: [0.5 1.5 2.5]  - ist nicht verschlüsselt
+
 
 # Die Subtraktion funktioniert, weil der unverschlüsselte prototype_vector 
 # intern von Bibliothek-TenSEAL automatisch in ein "plaintext polynomial" codiert wird.
