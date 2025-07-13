@@ -59,7 +59,7 @@ X_scaled = scaler.fit_transform(X)
 y_binary_np = y_binary.to_numpy()
 
 print("-> Server trainiert das GMLVQ-Modell (dies geschieht nur einmal)...")
-server_model = GmlvqModel(prototypes_per_class=3, regularization=0.35, random_state=42)
+server_model = GmlvqModel(prototypes_per_class=2, regularization=0.35, gtol=1e-5, random_state=42)
 server_model.fit(X_scaled, y_binary_np)
 
 # Extrahiere die gelernten Modellparameter
