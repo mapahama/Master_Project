@@ -40,7 +40,7 @@ print("="*50)
 
 print("-> Lade Heart Disease Datensatz...")
 try:
-    df = pd.read_csv("heart_data_pretty.csv", sep='\s+')
+    df = pd.read_csv("../heart_data_pretty.csv", sep='\s+')
 except FileNotFoundError:
     print("\nFEHLER: Die Datensatz-Datei `heart_data_pretty.csv` wurde nicht gefunden.")
     exit()
@@ -60,7 +60,7 @@ X_scaled = scaler.fit_transform(X)
 y_binary_np = y_binary.to_numpy()
 
 print("-> Server trainiert das GLVQ-Modell (dies geschieht nur einmal)...")
-server_model = GlvqModel(prototypes_per_class=3, beta=2, random_state=42)
+server_model = GlvqModel(prototypes_per_class=3, beta=2, gtol=1e-5, random_state=42)
 server_model.fit(X_scaled, y_binary_np)
 
 prototypes = server_model.w_
