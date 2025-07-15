@@ -7,19 +7,20 @@
 from ucimlrepo import fetch_ucirepo
 # um einen Datensatz in Trainings- und Test-Subsets aufzuteilen
 from sklearn.model_selection import train_test_split
-# um Merkmale zu standardisieren (Mittelwert 0, Standardabweichung 1)
-from sklearn.preprocessing import StandardScaler
+# um Merkmale zu standardisieren, im Bereich [-1,1]
+from sklearn.preprocessing import MinMaxScaler
 # GlvqModel: Die Klasse für das Generalized Learning Vector Quantization Modell
 from sklearn_lvq import GlvqModel
+from sklearn.ensemble import IsolationForest
 
 # Verschiedene Metriken aus `sklearn.metrics` zur Evaluation des Klassifikationsmodells:
 from sklearn.metrics import (
-    confusion_matrix,           # Zur Berechnung der Konfusionsmatrix (zeigt richtig/falsch klassifizierte Instanzen pro Klasse).
-    ConfusionMatrixDisplay,     # Zum einfachen grafischen Darstellen der Konfusionsmatrix.
-    precision_score,            # Zur Berechnung der Präzision (Anteil der korrekt positiven Vorhersagen an allen positiven Vorhersagen).
-    recall_score,               # Zur Berechnung des Recalls/Sensitivität (Anteil der korrekt positiven Vorhersagen an allen tatsächlichen Positiven)
-    f1_score,                   # Zur Berechnung des F1-Scores (harmonisches Mittel aus Precision und Recall).
-    classification_report       # Zur Erstellung eines Textberichts mit den wichtigsten Metriken (Precision, Recall, F1-Score, Support) pro Klasse
+    confusion_matrix,          # Zur Berechnung der Konfusionsmatrix (zeigt richtig/falsch klassifizierte Instanzen pro Klasse).
+    ConfusionMatrixDisplay,    # Zum einfachen grafischen Darstellen der Konfusionsmatrix.
+    precision_score,           # Zur Berechnung der Präzision (Anteil der korrekt positiven Vorhersagen an allen positiven Vorhersagen).
+    recall_score,              # Zur Berechnung des Recalls/Sensitivität (Anteil der korrekt positiven Vorhersagen an allen tatsächlichen Positiven)
+    f1_score,                  # Zur Berechnung des F1-Scores (harmonisches Mittel aus Precision und Recall).
+    classification_report      # Zur Erstellung eines Textberichts mit den wichtigsten Metriken (Precision, Recall, F1-Score, Support) pro Klasse
 )
 
 # Bibliothek für Datenmanipulation und -analyse
@@ -38,9 +39,9 @@ from matplotlib.lines import Line2D
 # Klasse für die Hauptkomponentenanalyse (Principal Component Analysis) verwendet zur Dimensionsreduktion
 from sklearn.decomposition import PCA
 
-# === === === === === ===  === 
+# === === === === === ===  ===
 # ===  1. Dataset laden    ===
-# === === === === === ===  === 
+# === === === === === ===  ===
 print("Lade Heart Disease Datensatz...")
 # Ruft den "Heart Disease" Datensatz (mit der ID 45) vom UCI Machine Learning Repository ab.
 heart_disease = fetch_ucirepo(id=45)
@@ -52,9 +53,9 @@ X = heart_disease.data.features.copy()
 y = heart_disease.data.targets.copy()
 print("Datensatz geladen.")
 
-# === === === === === === === === === 
+# === === === === === === === === ===
 # ===  2. Targets binär machen    ===
-# === === === === === === === === === 
+# === === === === === === === === ===
 # Die ursprüngliche Zielvariable dieses Datensatzes kann mehrere Werte für den Schweregrad
 # der Herzerkrankung enthalten (0 = gesund, 1-4 = verschiedene Stufen von krank).
 if isinstance(y, pd.DataFrame) and y.shape[1] == 1:
@@ -75,9 +76,9 @@ print("Verteilung der binären Zielvariable:")
 print(y_binary.value_counts())  # 0    164
                                 # 1    139
 
-# === === === === === === === 
+# === === === === === === ===
 # ===  3. Vorverarbeitung ===
-# === === === === === === === 
+# === === === === === === ===
 # Merkmalsdaten (X) bereinigen und für das Modell vorbereiten
 print("Starte Vorverarbeitung...")
 # Ersetze fehlende Werte, die im Datensatz als '?' (Fragezeichen) kodiert sind, durch `np.nan`.
@@ -90,27 +91,94 @@ X = X.apply(pd.to_numeric, errors='coerce')
 # Fülle alle verbleibenden `np.nan`-Werte (fehlende Werte) mit dem Median der jeweiligen Spalte
 X.fillna(X.median(), inplace=True)
 
-# Dieser Scaler standardisiert Merkmale, indem er den Mittelwert jeder Spalte abzieht
-# und dann durch die Standardabweichung teilt. Ergebnis: Mittelwert 0, Standardabweichung 1.
-# Ziel: alle Merkmale  auf eine ähnliche Skala (Bereich) zu bringen!
-scaler = StandardScaler()
+#---------------------
+# AUSREISSERERKENNUNG
+#---------------------
 
-# berechne Mittelwert und Standardabweichung für jede Spalte
-X_scaled = scaler.fit_transform(X)
-print("Vorverarbeitung abgeschlossen.")
+# --- AUSREISSERERKENNUNG Schritt 1: Visuelle Ausreißererkennung mit Boxplots (Univariat) ---
+# Die Boxplots zeigen uns, OB es Ausreißer gibt
+print("\n--- Erstelle Boxplots für jedes Merkmal ---")
+plt.figure(figsize=(20, 15))
+for i, col in enumerate(X.columns):
+    plt.subplot(4, 4, i + 1)
+    sns.boxplot(y=X[col], color='skyblue')
+    plt.title(col)
+    plt.ylabel('')
+plt.suptitle('Boxplots für jedes Merkmal zur univariaten Ausreißererkennung', fontsize=16)
+plt.tight_layout(rect=[0, 0, 1, 0.96])
+plt.show()
 
-# === === === === === === ===  === 
-# ===   4. Train/Test-Split    ===
-# === === === === === === ===  === 
+# --- AUSREISSERERKENNUNG Schritt 2: Ausreißererkennung mit Isolation Forest (Multivariat) ---
+# Der Isolation Forest entscheidet WELCHE  Ausreißer entfernt werden sollten
+print("\n--- Wende Isolation Forest an ---")
+# HINWEIS: Die Daten werden hier nur für den Zweck der Ausreißererkennung skaliert !!
+scaler_for_iso = MinMaxScaler(feature_range=(-1, 1))
+X_scaled_for_iso = scaler_for_iso.fit_transform(X)
+
+# Isolation Forest initialisieren und anwenden
+# contamination legt den erwarteten Anteil der Ausreißer fest ( in diesem Fall 4%, da der Datensatz klein ist)
+iso_forest = IsolationForest(contamination=0.08, random_state=42)
+predictions = iso_forest.fit_predict(X_scaled_for_iso) # -1 für Ausreißer, 1 für Inlier
+
+# Indizes der als Ausreißer markierten Datenpunkte
+outlier_indices = np.where(predictions == -1)[0]
+print(f"Anzahl der erkannten Ausreißer: {len(outlier_indices)}") # Output: 16
+
+# --- AUSREISSERERKENNUNG Schritt 3: Visualisierung der erkannten Ausreißer via PCA ---
+print("\n---Schritt 3: Visualisiere Ausreißer in 2D ---")
+# Reduziere die Dimensionen auf 2D für die Visualisierung
+pca = PCA(n_components=2)
+# HINWEIS: PCA wird auf denselben skalierten Daten wie der Isolation Forest ausgeführt
+X_pca = pca.fit_transform(X_scaled_for_iso)
+
+plt.figure(figsize=(12, 8))
+# Zeichne die regulären Datenpunkte ("Inlier")
+plt.scatter(X_pca[predictions == 1, 0], X_pca[predictions == 1, 1], c='dodgerblue', alpha=0.7, label='Inlier')
+# Zeichne die erkannten Ausreißer
+plt.scatter(X_pca[outlier_indices, 0], X_pca[outlier_indices, 1], c='red', edgecolor='k', s=90, label='Ausreißer')
+
+plt.title('Erkannte Ausreißer durch Isolation Forest (visualisiert mit PCA)')
+plt.xlabel('Erste Hauptkomponente')
+plt.ylabel('Zweite Hauptkomponente')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# --- AUSREISSERERKENNUNG Schritt 4: Entfernen der Ausreißer ---
+print("\n--- Schritt 4: Entferne Ausreißer aus dem Datensatz ---")
+print(f"Originale Datenform (X): {X.shape}")
+# y_binary wird hier verwendet, da es die korrekte binäre Zielvariable ist
+print(f"Originale Datenform (y): {y_binary.shape}")
+
+# Entferne die Ausreißer aus X und y_binary
+X_clean = X.drop(X.index[outlier_indices])
+y_clean = y_binary.drop(y_binary.index[outlier_indices])
+
+print(f"Neue Datenform nach Außreiser-Bereinigung (X_clean): {X_clean.shape}")
+print(f"Neue Datenform nach Außreiser-Bereinigung (y_clean): {y_clean.shape}")
+
+# === === === === === === ===  ===
+# ===  4. Train/Test-Split   ===
+# === === === === === === ===  ===
 # Aufteilung der Daten in Trainings- und Testsets, um das Modell auf einem Teil der Daten zu trainieren
 # und auf einem separaten, ungesehenen Teil zu evaluieren.
 
-# `stratify=y_binary`: Stellt sicher, dass das Verhältnis der Klassen (0 und 1) in den Trainings-
-# und Testsets ungefähr dem Verhältnis im gesamten Datensatz `y_binary` entspricht.
+# Die BEREINIGTEN Daten (X_clean, y_clean) werden nun aufgeteilt.
 X_train, X_test, y_train, y_test = train_test_split(
-    X_scaled, y_binary, test_size=0.2, random_state=42, stratify=y_binary
+    X_clean, y_clean, test_size=0.2, random_state=42, stratify=y_clean
 )
 print(f"Daten aufgeteilt: {X_train.shape[0]} Trainingspunkte, {X_test.shape[0]} Testpunkte.")
+
+# Die Skalierung erfolgt NACH der Aufteilung.
+# Der Scaler wird nur auf den Trainingsdaten angepasst, um Datenlecks zu vermeiden.
+print("Skaliere Trainings- und Testdaten im Bereich [-1, 1]...")
+scaler = MinMaxScaler(feature_range=(-1, 1))
+
+# Scaler auf Trainingsdaten anpassen und diese transformieren
+X_train = scaler.fit_transform(X_train)
+# Testdaten NUR transformieren (mit dem auf den Trainingsdaten gelernten Scaler)
+X_test = scaler.transform(X_test)
+print("Skalierung abgeschlossen.")
 
 # === === === === === === === === === === === 
 # ===  5. GLVQ mit mehreren Prototypen    ===
