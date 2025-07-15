@@ -1,3 +1,4 @@
+
 # .\venv311\Scripts\activate
 
 #####################################
@@ -9,7 +10,8 @@
 # 3. Gradient Toleranz (gtol)
 #
 # Dataset splits (Training / Testing):
-# 1. 80/20  (voreingestellt)
+# 1. 80/20
+# 2. 90/10
 #
 #####################################
 
@@ -20,24 +22,25 @@
 from ucimlrepo import fetch_ucirepo
 # um einen Datensatz in Trainings- und Test-Subsets aufzuteilen
 from sklearn.model_selection import StratifiedKFold, train_test_split, GridSearchCV
-# um Merkmale zu standardisieren (Mittelwert 0, Standardabweichung 1)
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 # GmlvqModel: Die Klasse für das Generalized Matrix Learning Vector Quantization Modell
 from sklearn_lvq import GmlvqModel
+from sklearn.ensemble import IsolationForest
+from sklearn.decomposition import PCA
 
 # Verschiedene Metriken aus sklearn.metrics zur Evaluation des Klassifikationsmodells:
 from sklearn.metrics import (
     precision_score,
     recall_score,
     accuracy_score,
-    confusion_matrix 
+    confusion_matrix
 )
 
 
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt 
-import seaborn as sns 
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # === === === === === ===  ===
 # ===  1. Dataset laden    ===
@@ -54,7 +57,7 @@ y = heart_disease.data.targets.copy()
 print("Datensatz geladen.")
 
 # === === === === === === === === ===
-# ===  2. Targets binär machen   ===
+# ===  2. Targets binär machen    ===
 # === === === === === === === === ===
 # (0 = gesund, 1-4 = verschiedene Stufen von krank).
 if isinstance(y, pd.DataFrame) and y.shape[1] == 1:
@@ -88,42 +91,106 @@ X = X.apply(pd.to_numeric, errors='coerce')
 
 # Fülle alle verbleibenden `np.nan`-Werte (fehlende Werte) mit dem Median der jeweiligen Spalte
 X.fillna(X.median(), inplace=True)
+print("Basis-Vorverarbeitung abgeschlossen.")
 
-### HIER FEATURE-NAMEN SPEICHERN ###
 # Speichere die Spaltennamen, bevor die Daten in ein Numpy-Array umgewandelt werden
 feature_names = X.columns.tolist()
 
+#---------------------
+# AUSREISSERERKENNUNG 
+#---------------------
 
-# Dieser Scaler standardisiert Merkmale, indem er den Mittelwert jeder Spalte abzieht
-# und dann durch die Standardabweichung teilt. Ergebnis: Mittelwert 0, Standardabweichung 1.
-# Ziel: alle Merkmale  auf eine ähnliche Skala (Bereich) zu bringen!
-scaler = StandardScaler()
+# --- AUSREISSERERKENNUNG Schritt 1: Visuelle Ausreißererkennung mit Boxplots (Univariat) ---
+# Die Boxplots zeigen uns, OB es Ausreißer gibt
+print("\n--- Erstelle Boxplots für jedes Merkmal ---")
+plt.figure(figsize=(20, 15))
+for i, col in enumerate(X.columns):
+    plt.subplot(4, 4, i + 1)
+    sns.boxplot(y=X[col], color='skyblue')
+    plt.title(col)
+    plt.ylabel('')
+plt.suptitle('Boxplots für jedes Merkmal zur univariaten Ausreißererkennung', fontsize=16)
+plt.tight_layout(rect=[0, 0, 1, 0.96])
+plt.show()
 
-# berechne Mittelwert und Standardabweichung für jede Spalte
-X_scaled = scaler.fit_transform(X)
-# Wichtig: Konvertiere y_binary zu einem numpy array für die Kreuzvalidierung
-y_binary_np = y_binary.to_numpy() 
-print("Vorverarbeitung abgeschlossen.")
+# --- AUSREISSERERKENNUNG Schritt 2: Ausreißererkennung mit Isolation Forest (Multivariat) ---
+# Der Isolation Forest entscheidet WELCHE  Ausreißer entfernt werden sollten
+print("\n--- Wende Isolation Forest an ---")
+# HINWEIS: Die Daten werden hier nur für den Zweck der Ausreißererkennung skaliert !!
+scaler_for_iso = MinMaxScaler(feature_range=(-1, 1))
+X_scaled_for_iso = scaler_for_iso.fit_transform(X)
+
+# Isolation Forest initialisieren und anwenden
+# contamination legt den erwarteten Anteil der Ausreißer fest
+iso_forest = IsolationForest(contamination=0.08, random_state=42) # 8%
+predictions = iso_forest.fit_predict(X_scaled_for_iso) # -1 für Ausreißer, 1 für Inlier
+
+# Indizes der als Ausreißer markierten Datenpunkte
+outlier_indices = np.where(predictions == -1)[0]
+print(f"Anzahl der erkannten Ausreißer: {len(outlier_indices)}")
+
+# --- AUSREISSERERKENNUNG Schritt 3: Visualisierung der erkannten Ausreißer via PCA ---
+print("\n---Schritt 3: Visualisiere Ausreißer in 2D ---")
+# Reduziere die Dimensionen auf 2D für die Visualisierung
+pca = PCA(n_components=2)
+# HINWEIS: PCA wird auf denselben skalierten Daten wie der Isolation Forest ausgeführt
+X_pca = pca.fit_transform(X_scaled_for_iso)
+
+plt.figure(figsize=(12, 8))
+# Zeichne die regulären Datenpunkte ("Inlier")
+plt.scatter(X_pca[predictions == 1, 0], X_pca[predictions == 1, 1], c='dodgerblue', alpha=0.7, label='Inlier')
+# Zeichne die erkannten Ausreißer
+plt.scatter(X_pca[outlier_indices, 0], X_pca[outlier_indices, 1], c='red', edgecolor='k', s=90, label='Ausreißer')
+
+plt.title('Erkannte Ausreißer durch Isolation Forest (visualisiert mit PCA)')
+plt.xlabel('Erste Hauptkomponente')
+plt.ylabel('Zweite Hauptkomponente')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+# --- AUSREISSERERKENNUNG Schritt 4: Entfernen der Ausreißer ---
+print("\n--- Entferne Ausreißer aus dem Datensatz ---")
+print(f"Originale Datenform (X): {X.shape}")
+# y_binary wird hier verwendet, da es die korrekte binäre Zielvariable ist
+print(f"Originale Datenform (y): {y_binary.shape}")
+
+# Entferne die Ausreißer aus X und y_binary
+X_clean = X.drop(X.index[outlier_indices])
+y_clean = y_binary.drop(y_binary.index[outlier_indices])
+
+print(f"Neue Datenform nach Außreiser-Bereinigung (X_clean): {X_clean.shape}")
+print(f"Neue Datenform nach Außreiser-Bereinigung (y_clean): {y_clean.shape}")
 
 
 # === === === === === === === === === === === === === === === === === ===
-# === Aufteilen in Trainings- und Test-Set  // 80/20          
+# === 4. Aufteilen und Skalieren nach der Ausreißererkennung
 # === === === === === === === === === === === === === === === === === ===
+
 # Die Kreuzvalidierung wird nur auf dem Trainingsset durchgeführt!
 # Das Testset wird für eine spätere, finale Evaluation zurückgehalten.
+
+# Schritt A: Aufteilung der BEREINIGTEN Daten (X_clean, y_clean)
 X_train_cv, X_test_holdout, y_train_cv, y_test_holdout = train_test_split(
-    X_scaled,
-    y_binary_np,
-    test_size=0.20,      # Trainings-Set ist 80%, Test-Set ist 20%
-    random_state=42,     # Für reproduzierbare Ergebnisse 
-    stratify=y_binary_np # Stellt sicher, dass die Klassenverteilung in beiden Sets gleich ist
+    X_clean,
+    y_clean,
+    test_size=0.10,      # Trainings-Set ist 80%, Test-Set ist 20%
+    random_state=42,     # Für reproduzierbare Ergebnisse
+    stratify=y_clean     # Stellt sicher, dass die Klassenverteilung in beiden Sets gleich ist
 )
 
 print(f"\nDaten aufgeteilt: {len(X_train_cv)} Proben für Kreuzvalidierung und {len(X_test_holdout)} für das finale Testen.")
 
+# Schritt B: Skalierung der aufgeteilten Daten im Bereich [-1,1]
+scaler = MinMaxScaler(feature_range=(-1, 1))
+X_train_cv = scaler.fit_transform(X_train_cv)
+X_test_holdout = scaler.transform(X_test_holdout) 
+print("Skalierung der Trainings- und Testsets abgeschlossen.")
+
 
 # === === === === === === === === === === === === === === === === === === === === ===
-# ===  4. Hyperparameter-Tuning mit GridSearchCV für GMLVQ                       ===
+# ===  5. Hyperparameter-Tuning mit GridSearchCV für GMLVQ                       ===
 # === === === === === === === === === === === === === === === === === === === === ===
 print("\n--- STARTE GridSearchCV: Tuning von 'prototypes_per_class' , 'regularization' , 'gtol' ---")
 
@@ -131,8 +198,8 @@ print("\n--- STARTE GridSearchCV: Tuning von 'prototypes_per_class' , 'regulariz
 param_grid = {
     'prototypes_per_class': [1, 2, 3, 4, 5],
     'regularization': np.arange(0.0, 0.5, 0.05).tolist(), # Hilft Overfitting der Relevanzmatrix zu verhindern
-    'gtol': [1e-4, 1e-5, 1e-6]  # Das Training stoppt, wenn die Norm des Gradienten unter diesen Wert fällt. 
-                                # Ein kleinerer Wert führt zu einer längeren, aber potenziell genaueren Konvergenz.
+    'gtol': [1e-4, 1e-5, 1e-6]  # Das Training stoppt, wenn die Norm des Gradienten unter diesen Wert fällt.
+                                 # Ein kleinerer Wert führt zu einer längeren, aber potenziell genaueren Konvergenz.
 }
 
 # 2. Definiere die Kreuzvalidierungs-Strategie
@@ -153,15 +220,15 @@ grid_search = GridSearchCV(
 
 # 4. Starte die Suche auf dem 80%-Trainingsdatensatz
 print("GridSearchCV trainiert nun...")
+
 grid_search.fit(X_train_cv, y_train_cv)
 print("GridSearchCV abgeschlossen.")
 
 
-# === === === === === === === === ===
-# ===  5. FINALES TUNING-ERGEBNIS ===
-# === === === === === === === === ===
+
+# FINALES TUNING-ERGEBNIS 
 print("\n\n==================================================")
-print("===           FINALES TUNING-ERGEBNIS           ===")
+print("===           FINALES TUNING-ERGEBNIS            ===")
 print("===================================================")
 
 # Gib die besten gefundenen Parameter und die dazugehörige CV-Genauigkeit aus
@@ -171,11 +238,11 @@ print(f"\nBeste Kreuzvalidierungs-Genauigkeit (Accuracy) auf den Trainingsdaten:
 
 
 # === === === === === === === === === === === === === === === === ===
-# ===  6. FINALE EVALUATION AUF UNGESEHENEN TESTDATEN (20 %)    ===
+# ===  6. FINALE EVALUATION AUF UNGESEHENEN TESTDATEN (20 %)     ===
 # === === === === === === === === === === === === === === === === ===
 
 print("\n\n================================================================")
-print("===  FINALE EVALUATION AUF DEM UNBERÜHRTEN TEST-SET  ===")
+print("===   FINALE EVALUATION AUF DEM UNBERÜHRTEN TEST-SET   ===")
 print("================================================================")
 
 # Wichtig: GridSearchCV trainiert automatisch ein finales Modell mit den besten Parametern
@@ -199,11 +266,11 @@ print(f"  -> Finale Recall:     {final_recall:.4f}")
 
 
 # === === === === === === === === === === === === === === === ===
-# ===  7. KONFUSIONSMATRIX FÜR DAS FINALE TEST-SET            ===
+# ===  7. KONFUSIONSMATRIX FÜR DAS FINALE TEST-SET        ===
 # === === === === === === === === === === === === === === === ===
 
 print("\n\n================================================================")
-print("===           KONFUSIONSMATRIX FÜR DAS TEST-SET             ===")
+print("===        KONFUSIONSMATRIX FÜR DAS TEST-SET         ===")
 print("================================================================")
 
 # 1. Berechne die Konfusionsmatrix
@@ -226,16 +293,16 @@ plt.yticks(ticks=np.arange(len(class_names)) + 0.5, labels=class_names, rotation
 print("\nZeige Konfusionsmatrix an...")
 plt.show()
 
-'''
+
 # === === === === === === === === === === === === === === === ===
 # ===  8. VISUALISIERUNG DER GMLVQ RELEVANZ-MATRIX (OMEGA)    ===
 # === === === === === === === === === === === === === === === ===
 print("\n\n================================================================")
-print("===    GMLVQ RELEVANZ-MATRIX (OMEGA) VISUALISIERUNG     ===")
+print("===    GMLVQ RELEVANZ-MATRIX (OMEGA) VISUALISIERUNG    ===")
 print("================================================================")
 
 # 1. Extrahiere die OMEGA Relevanz-Matrix aus dem besten Modell
-# Das korrekte Attribut heißt .omega_    // laut sklearn_lvq Dokumentation
+# Das korrekte Attribut heißt .omega_      // laut sklearn_lvq Dokumentation
 omega_matrix = grid_search.best_estimator_.omega_
 
 # 2. Erstelle die Heatmap
@@ -258,13 +325,13 @@ plt.tight_layout() # Passt das Layout an, um Überschneidungen zu vermeiden
 print("\nZeige Relevanz-Matrix an...")
 print("Helle Felder auf der Diagonalen zeigen die wichtigsten Merkmale an.")
 plt.show()
-'''
+
 
 # === === === === === === === === === === === === === === === ===
-# ===  9. VISUALISIERUNG DER GMLVQ RELEVANZ-MATRIX (LAMBDA)    ===
+# ===  9. VISUALISIERUNG DER GMLVQ RELEVANZ-MATRIX (LAMBDA)     ===
 # === === === === === === === === === === === === === === === ===
 print("\n\n================================================================")
-print("===    GMLVQ RELEVANZ-MATRIX (LAMBDA) VISUALISIERUNG     ===")
+print("===    GMLVQ RELEVANZ-MATRIX (LAMBDA) VISUALISIERUNG    ===")
 print("================================================================")
 
 # Extrahiere omega_ aus dem trainierten Modell
@@ -292,6 +359,32 @@ plt.yticks(rotation=0)
 plt.tight_layout()
 plt.show()
 
-
-# Ergebnisse:  {'gtol': 1e-05, 'prototypes_per_class': 2, 'regularization': 0.35000000000000003}
-# Accuracy:      89.2 %
+##########################
+# Ergebnisse:
+###########################
+#
+# GridSearchCV Tuning von 'prototypes_per_class' , 'regularization' , 'gtol' 
+# Fitting 5 folds for each of 150 candidates, totalling 750 fits
+#
+#------------------------
+# ( 80/20 Dataset-Split )
+#------------------------
+# Die beste gefundene Hyperparameter-Kombination  ( 80/20 Dataset-Split ) ist:
+#  -> {'gtol': 1e-06, 'prototypes_per_class': 3, 'regularization': 0.05}
+#
+# Leistung des finalen Modells auf den ungesehenen Testdaten (80/20 Dataset-Split):
+#  -> Finale Accuracy:   0.8571
+#  -> Finale Precision:  0.8400
+#  -> Finale Recall:     0.8400
+#
+#
+#------------------------
+# ( 90/10 Dataset-Split )
+#------------------------
+# Die beste gefundene Hyperparameter-Kombination ist:
+#  -> {'gtol': 1e-05, 'prototypes_per_class': 2, 'regularization': 0.4}
+#
+# Leistung des finalen Modells auf den ungesehenen Testdaten:
+#  -> Finale Accuracy:   0.8929
+#  -> Finale Precision:  0.9091
+#  -> Finale Recall:     0.8333
