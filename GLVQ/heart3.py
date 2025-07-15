@@ -116,7 +116,7 @@ scaler_for_iso = MinMaxScaler(feature_range=(-1, 1))
 X_scaled_for_iso = scaler_for_iso.fit_transform(X)
 
 # Isolation Forest initialisieren und anwenden
-# contamination legt den erwarteten Anteil der Ausreißer fest ( in diesem Fall 4%, da der Datensatz klein ist)
+# contamination legt den erwarteten Anteil der Ausreißer fest 
 iso_forest = IsolationForest(contamination=0.08, random_state=42)
 predictions = iso_forest.fit_predict(X_scaled_for_iso) # -1 für Ausreißer, 1 für Inlier
 
