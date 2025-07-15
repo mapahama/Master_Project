@@ -42,7 +42,7 @@ def get_server_assets():
     """
     # --- Schritt 1: Daten laden und vorverarbeiten ---
     print("--- SERVER: Lade Datensatz für das einmalige Training... ---")
-    df = pd.read_csv("../heart_data_pretty.csv", sep='\s+')
+    df = pd.read_csv("heart_data_pretty.csv", sep='\s+')
     X = df.drop(columns=["target"]).copy()
     y = (df["target"] > 0).astype(int)
     feature_names = X.columns.tolist()
