@@ -27,7 +27,8 @@
 
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.ensemble import IsolationForest
 from sklearn_lvq import GlvqModel
 from scipy.spatial.distance import sqeuclidean
 
@@ -38,33 +39,62 @@ print("="*50)
 print("### SERVER PROOF OF CONCEPT - SETUP ###")
 print("="*50)
 
-print("-> Lade Heart Disease Datensatz...")
-try:
-    df = pd.read_csv("../heart_data_pretty.csv", sep='\s+')
-except FileNotFoundError:
-    print("\nFEHLER: Die Datensatz-Datei `heart_data_pretty.csv` wurde nicht gefunden.")
-    exit()
+#####################################################
+# --- Schritt 1: Daten laden und vorverarbeiten ---
+#####################################################
 
+print("--- SERVER: Lade Datensatz für das einmalige Training... ---")
+# Pfad zum Datensatz
+df = pd.read_csv("../heart_data_pretty.csv", sep='\s+')
 X = df.drop(columns=["target"]).copy()
-y = df["target"].copy()
-feature_names = X.columns.tolist()
-y_binary = (y > 0).astype(int)
+y_original = (df["target"] > 0).astype(int)
 
-print("-> Starte Vorverarbeitung...")
+feature_names = X.columns.tolist()
 X.replace('?', np.nan, inplace=True)
 X = X.apply(pd.to_numeric, errors='coerce')
 X.fillna(X.median(), inplace=True)
 
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
-y_binary_np = y_binary.to_numpy()
+#---------------------
+# AUSREISSERERKENNUNG
+#---------------------
 
-print("-> Server trainiert das GLVQ-Modell (dies geschieht nur einmal)...")
-server_model = GlvqModel(prototypes_per_class=3, beta=2, gtol=1e-5, random_state=42)
+# --- AUSREISSERERKENNUNG Schritt 1: Ausreißererkennung mit Isolation Forest (Multivariat) ---
+# Der Isolation Forest entscheidet WELCHE  Ausreißer entfernt werden sollten
+# Die Daten werden hier nur für den Zweck der Ausreißererkennung skaliert 
+scaler_for_iso = MinMaxScaler(feature_range=(-1, 1))
+X_scaled_for_iso = scaler_for_iso.fit_transform(X)
+
+# Isolation Forest initialisieren und anwenden
+# contamination legt den erwarteten Anteil der Ausreißer fest
+iso_forest = IsolationForest(contamination=0.08, random_state=42) # 8%
+predictions = iso_forest.fit_predict(X_scaled_for_iso) # -1 für Ausreißer, 1 für Inlier
+
+# Indizes der als Ausreißer markierten Datenpunkte
+outlier_indices = np.where(predictions == -1)[0]
+
+# --- AUSREISSERERKENNUNG Schritt 2: Entfernen der Ausreißer ---
+X_clean = X.drop(X.index[outlier_indices])
+y_clean = y_original.drop(y_original.index[outlier_indices])
+
+##################################################
+# --- Schritt 2: Modelltraining ---
+##################################################
+
+# Ziel: alle Merkmale  auf eine ähnliche Skala (Bereich [-1,1]) zu bringen!
+scaler = MinMaxScaler(feature_range=(-1, 1))
+    
+# Skaliere die BEREINIGTEN Daten 'X_clean'
+X_scaled = scaler.fit_transform(X_clean)
+# Verwende die BEREINIGTE Zielvariable 'y_clean'
+y_binary_np = y_clean.to_numpy()
+
+print("--- SERVER: Trainiere GLVQ-Modell... ---")
+server_model = GlvqModel(prototypes_per_class=1, beta=3, gtol=1e-5, random_state=42)
 server_model.fit(X_scaled, y_binary_np)
-
+    
 prototypes = server_model.w_
 proto_labels = server_model.c_w_
+
 print(f"-> Setup abgeschlossen. Modell ist trainiert und hat {len(prototypes)} Prototypen.")
 print("="*50 + "\n")
 
@@ -102,7 +132,7 @@ while True:
     patient_df = pd.DataFrame([patient_vector_list], columns=feature_names)
     scaled_patient_vector = scaler.transform(patient_df)
 
-    # --- 3. Unverschlüsselte Distanzen berechnen ---
+    # --- 3. !!! Unverschlüsselte !!! Distanzen berechnen ---
     #  Berechne die *quadrierte* euklidische Distanz
     unencrypted_distances = [sqeuclidean(scaled_patient_vector[0], p) for p in prototypes]
 
