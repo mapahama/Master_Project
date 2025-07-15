@@ -16,7 +16,7 @@
 # 7. Visualisierung der Modellerklärung durch Darstellung der gelernten Merkmals-Relevanzen.
 #
 # Der Client kennt das Machine-Learning-Modell (GMLVQ) oder dessen Prototypen zu keinem Zeitpunkt.
-# =================================================================================
+# =========================================================================================
 
 
 # --- Bibliotheken importieren ---
