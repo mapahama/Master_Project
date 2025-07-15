@@ -23,7 +23,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler
 import tenseal as ts
 import time
 import altair as alt  # Säulendiagramm
