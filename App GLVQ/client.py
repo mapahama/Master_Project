@@ -24,7 +24,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 import tenseal as ts
 import time
 import plotly.express as px
