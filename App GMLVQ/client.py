@@ -23,7 +23,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 import tenseal as ts
 import time
 import altair as alt  # Säulendiagramm
@@ -51,9 +51,9 @@ def setup_client_environment():
     context = ts.context(
         ts.SCHEME_TYPE.CKKS,
         poly_modulus_degree= 8192,  #32768  sehr lange Berechnungszeit (sogar wenn die Features anstatt 13 nur 2 sind)
-        coeff_mod_bit_sizes= [60, 30, 30, 60]  # [60] + [40]*12 + [60]  sehr lange Berechnungszeit (sogar wenn die Features anstatt 13 nur 2 sind)
+        coeff_mod_bit_sizes= [60, 40, 40, 60]  # [60] + [40]*12 + [60]  sehr lange Berechnungszeit (sogar wenn die Features anstatt 13 nur 2 sind)
     )
-    context.global_scale = 2**30 # wenn unter 20 -> Error: failed to find enough qualifying primes
+    context.global_scale = 2**40 # wenn unter 20 -> Error: failed to find enough qualifying primes
     context.generate_galois_keys()
 
     print("--- CLIENT: Umgebung initialisiert. ---")
@@ -109,7 +109,9 @@ if st.sidebar.button("Klassifikation durchführen", type="primary"):
     serialized_patient_vector = encrypted_patient_vector.serialize()
     
     context_for_server = context.copy()
-    context_for_server.make_context_public()
+        # Wir erstellen einen öffentlichen Kontext, der die riesigen Galois-Schlüssel NICHT enthält.
+        # Das macht die Serialisierung und den Transfer wesentlich schneller. // mit Galois Keys stürzt die App ab
+    context_for_server.make_context_public(generate_galois_keys=False) # Private Key und Galois keys entfernen!!!
     serialized_public_ckks_context = context_for_server.serialize()
 
     with st.spinner('Warte auf Antwort vom Server...'):
