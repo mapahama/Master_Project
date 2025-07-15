@@ -1,6 +1,6 @@
 
 # =================================================================================
-# SERVER-SEITIGE LOGIK 
+# SERVER-SEITIGE LOGIK
 # =================================================================================
 #
 # Dieser Code simuliert die serverseitige Komponente einer Client-Server-Anwendung.
@@ -26,9 +26,12 @@
 import streamlit as st # Wird hier nur für die Caching-Funktion @st.cache_resource genutzt
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
-from sklearn_lvq import GlvqModel
 import tenseal as ts
+
+from sklearn.preprocessing import MinMaxScaler
+from sklearn_lvq import GlvqModel
+from sklearn.ensemble import IsolationForest
+
 
 @st.cache_resource
 def get_server_assets():
@@ -39,11 +42,15 @@ def get_server_assets():
     In einer echten Anwendung würde man hier ein bereits fertig trainiertes Modell
     von der Festplatte laden.
     """
+    #####################################################
     # --- Schritt 1: Daten laden und vorverarbeiten ---
+    #####################################################
+
     print("--- SERVER: Lade Datensatz für das einmalige Training... ---")
-    df = pd.read_csv("../heart_data_pretty.csv", sep='\s+')  # load dataset locally
+    # Pfad zum Datensatz 
+    df = pd.read_csv("../heart_data_pretty.csv", sep='\s+')
     X = df.drop(columns=["target"]).copy()
-    y = (df["target"] > 0).astype(int)
+    y_original = (df["target"] > 0).astype(int)
     # Feature-Namen extrahieren, damit der Client sie erhalten kann
     feature_names = X.columns.tolist()
     
@@ -51,13 +58,53 @@ def get_server_assets():
     X = X.apply(pd.to_numeric, errors='coerce')
     X.fillna(X.median(), inplace=True)
 
+    #---------------------
+    # AUSREISSERERKENNUNG
+    #---------------------
+
+    # --- AUSREISSERERKENNUNG Schritt 1: Ausreißererkennung mit Isolation Forest (Multivariat) ---
+    # Der Isolation Forest entscheidet WELCHE  Ausreißer entfernt werden sollten
+    print("\n--- Wende Isolation Forest an ---")
+    # Die Daten werden hier nur für den Zweck der Ausreißererkennung skaliert 
+    scaler_for_iso = MinMaxScaler(feature_range=(-1, 1))
+    X_scaled_for_iso = scaler_for_iso.fit_transform(X)
+
+    # Isolation Forest initialisieren und anwenden
+    # contamination legt den erwarteten Anteil der Ausreißer fest
+    iso_forest = IsolationForest(contamination=0.08, random_state=42) # 8%
+    predictions = iso_forest.fit_predict(X_scaled_for_iso) # -1 für Ausreißer, 1 für Inlier
+
+    # Indizes der als Ausreißer markierten Datenpunkte
+    outlier_indices = np.where(predictions == -1)[0]
+    print(f"Anzahl der erkannten Ausreißer: {len(outlier_indices)}")
+
+    # --- AUSREISSERERKENNUNG Schritt 2: Entfernen der Ausreißer ---
+    print("\n--- Entferne Ausreißer aus dem Datensatz ---")
+    print(f"Originale Datenform (X): {X.shape}")
+    # y- target
+    print(f"Originale Datenform (y): {y_original.shape}")
+
+    # Entferne die Ausreißer aus X und y
+    X_clean = X.drop(X.index[outlier_indices])
+    y_clean = y_original.drop(y_original.index[outlier_indices])
+
+    print(f"Neue Datenform nach Außreiser-Bereinigung (X_clean): {X_clean.shape}")
+    print(f"Neue Datenform nach Außreiser-Bereinigung (y_clean): {y_clean.shape}")
+
+    ##################################################
     # --- Schritt 2: Modelltraining ---
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    y_binary_np = y.to_numpy()
+    ##################################################
+
+    # Ziel: alle Merkmale  auf eine ähnliche Skala (Bereich [-1,1]) zu bringen!
+    scaler = MinMaxScaler(feature_range=(-1, 1))
+    
+    # Skaliere die BEREINIGTEN Daten 'X_clean'
+    X_scaled = scaler.fit_transform(X_clean)
+    # Verwende die BEREINIGTE Zielvariable 'y_clean'
+    y_binary_np = y_clean.to_numpy()
 
     print("--- SERVER: Trainiere GLVQ-Modell... ---")
-    server_model = GlvqModel(prototypes_per_class=3, beta=2, gtol=1e-5, random_state=42)
+    server_model = GlvqModel(prototypes_per_class=1, beta=3, gtol=1e-5, random_state=42)
     server_model.fit(X_scaled, y_binary_np)
     
     prototypes = server_model.w_
@@ -66,6 +113,8 @@ def get_server_assets():
     print("--- SERVER: Modell trainiert und Assets geladen. ---")
     # Gibt alle Assets zurück, die von anderen Teilen der Anwendung benötigt werden könnten. // prototypes werden vom Client NICHT abgerufen
     return prototypes, proto_labels, scaler, feature_names
+
+
 
 def process_encrypted_request(serialized_encrypted_patient_vector, serialized_public_ckks_context):
     """
@@ -106,18 +155,10 @@ def process_encrypted_request(serialized_encrypted_patient_vector, serialized_pu
         enc_distance = enc_squared_diff.sum() # dies ist die Quadrierte Euklidische Distanz // Alle 13 Merkmale innerhalb des Vektors "enc_squared_diff" werden zu einem einzigen Wert addiert.
         encrypted_distances.append(enc_distance)
 
-        # Debug-Ausgaben, um den Prozess zu verfolgen. TODO: In Produktion zu entfernen.
-        print("\n--- encrypted_patient_vector:", encrypted_patient_vector)
-        print("\n--- prototype vector:", p_vector)
-        print("\n--- Aktuelle quadrierte Differenz:", enc_squared_diff)
-        print("\n--- Aktuelle quadrierte Distanz Datenpunkt/Vektor:", enc_distance)
-        print("\n-----------------")
-
     # 5. Bereite die Ergebnisse für die Rücksendung an den Client vor. (Serializieren von CKKS-Vektoren ist notwendig für Client/Server Kommunikation über das Netz)
     serialized_results = []
     for vec, label in zip(encrypted_distances, proto_labels):
         serialized_results.append((vec.serialize(), label))
-
 
     print("--- SERVER: Distanzberechnung abgeschlossen, sende Ergebnisse zurück. ---")
     return serialized_results
