@@ -186,7 +186,7 @@ print("Skalierung abgeschlossen.")
 # Initialisierung und Training des GLVQ-Modells.
 
 # Erstelle eine Instanz des 'GlvqModel'.
-model = GlvqModel(prototypes_per_class=3, random_state=42) # <-- hier wird Anzahl von Prototypen bestimmt! 3 Prototypen pro Klasse
+model = GlvqModel(prototypes_per_class=1, random_state=42) # <-- hier wird Anzahl von Prototypen bestimmt! 3 Prototypen pro Klasse
 print(f"Trainiere GLVQ-Modell mit {model.prototypes_per_class} Prototypen pro Klasse...")
 
 # Trainiere das GLVQ-Modell mit den Trainingsdaten (`X_train`, `y_train`).
@@ -664,3 +664,5 @@ print(f" Sicher klassifiziert (μ < 0): {safe_classified}/{total} = {safe_classi
 # Gibt die Anzahl und den Prozentsatz der Testpunkte aus, deren μ-Wert >= 0 war.
 print(f" Unsicher/falsch (μ ≥ 0): {unsafe_classified}/{total} = {unsafe_classified/total:.1%}")
 # test git push
+
+# Ergebnis:  1 Prototyp pro Klasse -> die beste Genauigkeit 87.5
