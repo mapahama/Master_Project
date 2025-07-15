@@ -27,8 +27,9 @@
 
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 from sklearn_lvq import GmlvqModel
+from sklearn.ensemble import IsolationForest
 
 # ==============================================================================
 # 1. SETUP: MODELL UND DATEN VORBEREITEN
@@ -54,9 +55,31 @@ X.replace('?', np.nan, inplace=True)
 X = X.apply(pd.to_numeric, errors='coerce')
 X.fillna(X.median(), inplace=True)
 
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
-y_binary_np = y_binary.to_numpy()
+#---------------------
+# AUSREISSERERKENNUNG
+#---------------------
+
+# --- AUSREISSERERKENNUNG Schritt 1: Ausreißererkennung mit Isolation Forest (Multivariat) ---
+# Der Isolation Forest entscheidet WELCHE  Ausreißer entfernt werden sollten
+# Die Daten werden hier nur für den Zweck der Ausreißererkennung skaliert 
+scaler_for_iso = MinMaxScaler(feature_range=(-1, 1))
+X_scaled_for_iso = scaler_for_iso.fit_transform(X)
+
+# Isolation Forest initialisieren und anwenden
+# contamination legt den erwarteten Anteil der Ausreißer fest
+iso_forest = IsolationForest(contamination=0.08, random_state=42) # 8%
+predictions = iso_forest.fit_predict(X_scaled_for_iso) # -1 für Ausreißer, 1 für Inlier
+
+# Indizes der als Ausreißer markierten Datenpunkte
+outlier_indices = np.where(predictions == -1)[0]
+
+# --- AUSREISSERERKENNUNG Schritt 2: Entfernen der Ausreißer ---
+X_clean = X.drop(X.index[outlier_indices])
+y_clean = y_binary.drop(y_binary.index[outlier_indices])
+
+scaler = MinMaxScaler(feature_range=(-1, 1))
+X_scaled = scaler.fit_transform(X_clean)
+y_binary_np = y_clean.to_numpy()
 
 print("-> Server trainiert das GMLVQ-Modell (dies geschieht nur einmal)...")
 server_model = GmlvqModel(prototypes_per_class=2, regularization=0.35, gtol=1e-5, random_state=42)
