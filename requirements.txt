@@ -1,0 +1,9 @@
+streamlit
+pandas
+numpy
+tenseal 
+time
+altair 
+sklearn.preprocessing
+sklearn_lvq 
+sklearn.ensemble 
