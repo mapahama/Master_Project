@@ -14,10 +14,13 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler
-from sklearn_lvq import GmlvqModel
 import tenseal as ts
 import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import MinMaxScaler
+from sklearn_lvq import GmlvqModel
+from sklearn.ensemble import IsolationForest
+
 
 
 # =================================================================================
@@ -61,11 +64,45 @@ def get_server_assets():
     X.replace('?', np.nan, inplace=True)
     X = X.apply(pd.to_numeric, errors='coerce')
     X.fillna(X.median(), inplace=True)
+
+    #---------------------
+    # AUSREISSERERKENNUNG
+    #---------------------
+
+    # --- AUSREISSERERKENNUNG Schritt 1: Ausreißererkennung mit Isolation Forest (Multivariat) ---
+    # Der Isolation Forest entscheidet WELCHE  Ausreißer entfernt werden sollten
+    print("\n--- Wende Isolation Forest an ---")
+    # Die Daten werden hier nur für den Zweck der Ausreißererkennung skaliert 
+    scaler_for_iso = MinMaxScaler(feature_range=(-1, 1))
+    X_scaled_for_iso = scaler_for_iso.fit_transform(X)
+
+    # Isolation Forest initialisieren und anwenden
+    # contamination legt den erwarteten Anteil der Ausreißer fest
+    iso_forest = IsolationForest(contamination=0.08, random_state=42) # 8%
+    predictions = iso_forest.fit_predict(X_scaled_for_iso) # -1 für Ausreißer, 1 für Inlier
+
+    # Indizes der als Ausreißer markierten Datenpunkte
+    outlier_indices = np.where(predictions == -1)[0]
+    print(f"Anzahl der erkannten Ausreißer: {len(outlier_indices)}")
+
+    # --- AUSREISSERERKENNUNG Schritt 2: Entfernen der Ausreißer ---
+    print("\n--- Entferne Ausreißer aus dem Datensatz ---")
+    print(f"Originale Datenform (X): {X.shape}")
+    # y- target
+    print(f"Originale Datenform (y): {y.shape}")
+
+    # Entferne die Ausreißer aus X und y
+    X_clean = X.drop(X.index[outlier_indices])
+    y_clean = y.drop(y.index[outlier_indices])
+
+    print(f"Neue Datenform nach Außreiser-Bereinigung (X_clean): {X_clean.shape}")
+    print(f"Neue Datenform nach Außreiser-Bereinigung (y_clean): {y_clean.shape}")
+
     # Initialisiert einen Skalierer, der alle Feature-Werte in den Bereich [-1, 1] transformiert.
     # Dies ist wichtig für die Stabilität des GMLVQ-Trainings und die Genauigkeit der sgn-Approximation. (erwartet Werte in [-1,1])
     scaler = MinMaxScaler(feature_range=(-1, 1))   # Alle Features in einem kleinen Wertebereich wegen sign Funk 
-    X_scaled = scaler.fit_transform(X)
-    y_binary_np = y.to_numpy()
+    X_scaled = scaler.fit_transform(X_clean)
+    y_binary_np = y_clean.to_numpy()
     print(f"--- SERVER: Trainiere GMLVQ-Modell mit {len(feature_names)} Features... ---")
 
     # Initialisiert das GMLVQ-Modell mit spezifischen Hyperparametern.  (Ausgewählt durch Cross Validation)
