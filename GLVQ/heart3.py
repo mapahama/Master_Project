@@ -1,7 +1,22 @@
 # .\venv311\Scripts\activate
 
+
+"""
+Zweck des Skripts
+-----------------------------------------
+
+GLVQ Modell:
+1.  **Datenaufbereitung:** Lädt den "Heart Disease" Datensatz, bereinigt ihn von fehlenden Werten und wandelt die Zielvariable in ein binäres Format um (0 = Gesund, 1 = Krank).
+2.  **Ausreißer-Bereinigung:** Identifiziert und entfernt statistische Ausreißer mithilfe des 'Isolation Forest'-Algorithmus, um die Datenqualität und die Modellleistung zu verbessern.
+3.  **Training & Evaluation:** Teilt die bereinigten Daten in ein Trainings- und ein Test-Set auf, skaliert sie und trainiert darauf ein 'Generalized Learning Vector Quantization' (GLVQ) Modell.
+      Anschließend wird das Modell  mit Metriken wie Accuracy, Precision, Recall und einer Konfusionsmatrix bewertet.
+4.  **Interpretation & Analyse:** Führt eine  Analyse der vom Modell gelernten "Prototypen" durch. Es wird visualisiert, wie ein typischer "gesunder" oder "kranker" Patient aussieht 
+      und wie das Modell seine Entscheidungen für einzelne Patienten trifft, was die Nachvollziehbarkeit erhöht.
+
+GLVQ trainiert mit 1 Prototyp pro Klasse, getestet mit 80/20 und 90/10 dataset-split
+"""
+
 # === Bibliotheken importieren ===
-# Dieser Block importiert alle notwendigen Python-Bibliotheken und spezifische Module/Funktionen.
 
 # Heart Disease Dataset
 from ucimlrepo import fetch_ucirepo
@@ -158,14 +173,14 @@ print(f"Neue Datenform nach Außreiser-Bereinigung (X_clean): {X_clean.shape}")
 print(f"Neue Datenform nach Außreiser-Bereinigung (y_clean): {y_clean.shape}")
 
 # === === === === === === ===  ===
-# ===  4. Train/Test-Split   ===
+# ===  4. Train/Test-Split     ===
 # === === === === === === ===  ===
 # Aufteilung der Daten in Trainings- und Testsets, um das Modell auf einem Teil der Daten zu trainieren
 # und auf einem separaten, ungesehenen Teil zu evaluieren.
 
 # Die BEREINIGTEN Daten (X_clean, y_clean) werden nun aufgeteilt.
 X_train, X_test, y_train, y_test = train_test_split(
-    X_clean, y_clean, test_size=0.2, random_state=42, stratify=y_clean
+    X_clean, y_clean, test_size=0.1, random_state=42, stratify=y_clean # test_size=0.2  UND test_size=0.1
 )
 print(f"Daten aufgeteilt: {X_train.shape[0]} Trainingspunkte, {X_test.shape[0]} Testpunkte.")
 
@@ -180,13 +195,13 @@ X_train = scaler.fit_transform(X_train)
 X_test = scaler.transform(X_test)
 print("Skalierung abgeschlossen.")
 
-# === === === === === === === === === === === 
-# ===  5. GLVQ mit mehreren Prototypen    ===
-# === === === === === === === === === === ===  
+# === === === === === === === 
+# ===  5. GLVQ Prototypen ===
+# === === === === === === === 
 # Initialisierung und Training des GLVQ-Modells.
 
 # Erstelle eine Instanz des 'GlvqModel'.
-model = GlvqModel(prototypes_per_class=1, random_state=42) # <-- hier wird Anzahl von Prototypen bestimmt! 3 Prototypen pro Klasse
+model = GlvqModel(prototypes_per_class=1, random_state=42) # <-- hier wird Anzahl von Prototypen bestimmt! 1 Prototyp pro Klasse
 print(f"Trainiere GLVQ-Modell mit {model.prototypes_per_class} Prototypen pro Klasse...")
 
 # Trainiere das GLVQ-Modell mit den Trainingsdaten (`X_train`, `y_train`).
@@ -665,4 +680,33 @@ print(f" Sicher klassifiziert (μ < 0): {safe_classified}/{total} = {safe_classi
 print(f" Unsicher/falsch (μ ≥ 0): {unsafe_classified}/{total} = {unsafe_classified/total:.1%}")
 # test git push
 
-# Ergebnis:  1 Prototyp pro Klasse -> die beste Genauigkeit 87.5
+#########################################
+# Ergebnisse mit 1 Prototyp pro Klasse  (80/20 Testset)
+#########################################
+#
+#--- GLVQ Kostenanalyse (Testset) ---
+# Durchschnittlicher μ-Wert: -0.4164
+# Sicher klassifiziert (μ < 0): 50/56 = 89.3%
+# Unsicher/falsch (μ ≥ 0): 6/56 = 10.7%
+#
+#--- Bewertungsmetriken ---
+# Accuracy: 0.8929
+# Precision: 0.9130
+# Recall:    0.8400
+# F1 Score:  0.8750
+
+
+#########################################
+# Ergebnisse mit 1 Prototyp pro Klasse  (90/10 Testset)
+#########################################
+#
+#--- GLVQ Kostenanalyse (Testset) ---
+# Durchschnittlicher μ-Wert: -0.4301
+# Sicher klassifiziert (μ < 0): 25/28 = 89.3%
+# Unsicher/falsch (μ ≥ 0): 3/28 = 10.7%
+#
+#--- Bewertungsmetriken ---
+# Accuracy: 0.8929
+# Precision: 0.9091
+# Recall:    0.8333
+# F1 Score:  0.8696
