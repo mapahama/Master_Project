@@ -24,6 +24,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import tenseal as ts
+import os
 
 from sklearn.preprocessing import MinMaxScaler
 from sklearn_lvq import GmlvqModel
@@ -42,7 +43,26 @@ def get_server_assets():
     """
     # --- Schritt 1: Daten laden und vorverarbeiten ---
     print("--- SERVER: Lade Datensatz für das einmalige Training... ---")
-    df = pd.read_csv("heart_data_pretty.csv", sep='\s+')
+    # df = pd.read_csv("heart_data_pretty.csv", sep='\s+')
+
+    # Neu Hosting
+    # Holt das Verzeichnis, in dem sich das aktuelle Skript befindet
+    script_dir = os.path.dirname(__file__)
+
+    # Erstellt den vollständigen Pfad zur CSV-Datei
+    # Da die CSV im selben Verzeichnis wie das Skript ist, ist es direkt der Dateiname
+    csv_file_path = os.path.join(script_dir, "heart_data_pretty.csv")
+
+    try:
+        df = pd.read_csv(csv_file_path, sep='\s+')
+        st.success("CSV-Datei erfolgreich geladen!")
+    except FileNotFoundError:
+        st.error(f"Fehler: Die Datei 'heart_data_pretty.csv' wurde nicht gefunden unter: {csv_file_path}")
+        st.info("Bitte stelle sicher, dass die CSV-Datei im selben Ordner wie dein Streamlit-Skript liegt.")
+    except Exception as e:
+        st.error(f"Ein unerwarteter Fehler ist aufgetreten: {e}")
+    # Neu Hosting
+
     X = df.drop(columns=["target"]).copy()
     y = (df["target"] > 0).astype(int)
     feature_names = X.columns.tolist()
