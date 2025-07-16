@@ -2,7 +2,7 @@ altair==5.5.0
 streamlit==1.46.1
 pandas==2.3.1
 numpy==2.3.1
-scikit-learn==1.7.0
-scipy==1.8.0         
+scikit-learn==1.1.3 
+scipy==1.7.3        
 sklearn-lvq==1.1.1
 tenseal==0.3.16
