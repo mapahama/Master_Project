@@ -1,4 +1,6 @@
-# Test zusammengesetztes Polynom
+# Test Rückgabewerte der approximierten Sign-Funktion durch ein zusammengesetztes Polynom
+# Erwartete Ergebnisse:  nahe 1, nahe 0,  oder nahe -1
+# Die finalen Ergebnisse werden als Kommentar im unteren Bereich nach dem Code dargestellt
 
 import tenseal as ts
 import numpy as np
@@ -107,7 +109,7 @@ else:
 print(f"\nVerwendete Anzahl von Kompositionen: {NUM_COMPOSITIONS}")
 print("Eine höhere Anzahl von Kompositionen kann die Genauigkeit weiter verbessern, erhöht aber auch die Multiplikationstiefe und das Rauschen.")
 
-#Optional: Plot für die Approximation des Polynoms 
+#Plot für die Approximation des Polynoms 
 # zur visuellen Bestätigung
 def plot_approximation_composed(poly_coeffs, num_compositions, context, test_values_for_plot):
     x_for_plot = np.linspace(-1, 1, 400)
@@ -150,7 +152,7 @@ plot_approximation_composed(poly_coeffs_single_step, NUM_COMPOSITIONS, context, 
 # Ergebnisse
 ###################
 #
-#  Testergebnisse (mit Polynom-Komposition):
+#  Testergebnisse (mit Polynom-Komposition): (7 mal)
 #  Originalwert    Erwartetes Signum    Entschlüsselte Approx.      Differenz
 #  ------------------------------------------------------------------------------
 #  0.8000          1.0000               1.0000                       8.8443e-08
