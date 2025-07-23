@@ -33,6 +33,7 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
     accuracy_score,
+    f1_score,
     confusion_matrix
 )
 
@@ -175,7 +176,7 @@ print(f"Neue Datenform nach Außreiser-Bereinigung (y_clean): {y_clean.shape}")
 X_train_cv, X_test_holdout, y_train_cv, y_test_holdout = train_test_split(
     X_clean,
     y_clean,
-    test_size=0.10,      # Trainings-Set ist 80%, Test-Set ist 20%
+    test_size=0.20,      # Trainings-Set ist 80%, Test-Set ist 20%
     random_state=42,     # Für reproduzierbare Ergebnisse
     stratify=y_clean     # Stellt sicher, dass die Klassenverteilung in beiden Sets gleich ist
 )
@@ -196,7 +197,7 @@ print("\n--- STARTE GridSearchCV: Tuning von 'prototypes_per_class' , 'regulariz
 
 # 1. Definiere das Gitter der zu testenden Parameter
 param_grid = {
-    'prototypes_per_class': [1, 2, 3, 4, 5],
+    'prototypes_per_class': [1, 2, 3],
     'regularization': np.arange(0.0, 0.5, 0.05).tolist(), # Hilft Overfitting der Relevanzmatrix zu verhindern
     'gtol': [1e-4, 1e-5, 1e-6]  # Das Training stoppt, wenn die Norm des Gradienten unter diesen Wert fällt.
                                  # Ein kleinerer Wert führt zu einer längeren, aber potenziell genaueren Konvergenz.
@@ -212,10 +213,10 @@ skf = StratifiedKFold(n_splits=N_SPLITS, shuffle=True, random_state=42)
 grid_search = GridSearchCV(
     estimator=GmlvqModel(random_state=42),
     param_grid=param_grid,
-    scoring='accuracy', # Optimiere für die beste Genauigkeit
+    scoring='f1', # f1 # Optimiere für die beste Genauigkeit
     cv=skf,
     verbose=1, # Zeigt den Fortschritt an
-    n_jobs=-1
+    n_jobs=1 # -1
 )
 
 # 4. Starte die Suche auf dem 80%-Trainingsdatensatz
@@ -234,7 +235,7 @@ print("===================================================")
 # Gib die besten gefundenen Parameter und die dazugehörige CV-Genauigkeit aus
 print(f"\nDie beste gefundene Hyperparameter-Kombination ist:")
 print(f"  -> {grid_search.best_params_}")
-print(f"\nBeste Kreuzvalidierungs-Genauigkeit (Accuracy) auf den Trainingsdaten: {grid_search.best_score_:.4f}")
+print(f"\nBeste Kreuzvalidierungs-Genauigkeit (F1) auf den Trainingsdaten: {grid_search.best_score_:.4f}")
 
 
 # === === === === === === === === === === === === === === === === ===
@@ -257,13 +258,14 @@ y_pred_final = grid_search.predict(X_test_holdout)
 final_accuracy = accuracy_score(y_test_holdout, y_pred_final)
 final_precision = precision_score(y_test_holdout, y_pred_final, zero_division=0)
 final_recall = recall_score(y_test_holdout, y_pred_final, zero_division=0)
+final_f1 = f1_score(y_test_holdout, y_pred_final, zero_division=0)
 
 # 3. Gib die finalen Ergebnisse aus
 print("\nLeistung des finalen Modells auf den ungesehenen Testdaten:")
 print(f"  -> Finale Accuracy:   {final_accuracy:.4f}")
 print(f"  -> Finale Precision:  {final_precision:.4f}")
 print(f"  -> Finale Recall:     {final_recall:.4f}")
-
+print(f"  -> Finale F1-Score:   {final_f1:.4f}")
 
 # === === === === === === === === === === === === === === === ===
 # ===  7. KONFUSIONSMATRIX FÜR DAS FINALE TEST-SET        ===
