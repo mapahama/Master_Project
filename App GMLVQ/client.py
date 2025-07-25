@@ -1,17 +1,23 @@
+
+
 # 	streamlit run client.py
 #   .\venv311\Scripts\activate
+
 
 # =================================================================================
 # CLIENT-SEITIGE LOGIK & UI für GMLVQ + CKKS
 # =================================================================================
 # Dieser Code implementiert die Client-Anwendung mit einer Streamlit-Benutzeroberfläche.
+# Er kommuniziert über HTTP mit einem separaten FastAPI-Server.
+#
 # Die Hauptaufgaben dieses Clients sind:
+#
 # 1. Bereitstellen einer UI, damit ein Nutzer seine Patientendaten eingeben kann.
 # 2. Vorbereiten (Skalieren) dieser Daten, damit sie für das Modell des Servers
 # 	verständlich sind.
 # 3. Erzeugen eines Verschlüsselungskontexts (CKKS) und Halten des geheimen Schlüssels.
 # 4. Verschlüsseln der Patientendaten und Senden der Anfrage an den Server.
-# 5. Empfangen der verschlüsselten Ergebnisse und der Modell-Relevanzen vom Server.
+# 5. Empfangen der verschlüsselten Ergebnisse und der Modell-Relevanzen vom Server über HTTP-Request.
 # 6. Entschlüsseln der Ergebnisse und Treffen der finalen Klassifikationsentscheidung.
 # 7. Visualisierung der Modellerklärung durch Darstellung der gelernten Merkmals-Relevanzen.
 #
@@ -26,10 +32,10 @@ import numpy as np
 import tenseal as ts
 import time
 import altair as alt  # Säulendiagramm
-
-# --- Server-Kommunikation simulieren ---
-# Importiert die "API-Funktion" aus der server.py Datei.
-from server import get_server_assets, process_encrypted_request
+import requests
+import base64
+import joblib
+from io import BytesIO
 
 
 @st.cache_resource
@@ -38,21 +44,36 @@ def setup_client_environment():
     Initialisiert den Client: Lädt Scaler, Feature-Namen und erstellt den CKKS-Kontext mit Schlüsselpaar.
     Diese Funktion wird nur einmal ausgeführt und die Ergebnisse werden gecached.
     
-    WICHTIG: Der Client kennt weder die Prototypen noch die Omega-Matrix des GMLVQ-Modells.
+    WICHTIG: Der Client kennt weder die Prototypen noch die Lambda-Matrix des GMLVQ-Modells.
     """
     # === Schritt 1: Lade benötigte Assets vom Server ===
     print("--- CLIENT: Frage Scaler und Feature-Namen vom Server an... ---")
-    # Wir ignorieren alle Modell-Parameter außer Scaler und Feature-Namen
-    _, _, scaler, feature_names, _, _ = get_server_assets()
+    try:
+        # Echte HTTP-Anfrage an den Server, um die Assets abzurufen
+        response = requests.get("http://localhost:8000/assets_gmlvq")
+        response.raise_for_status()
+        assets = response.json()
+        
+        # Deserialisieren des Scalers aus dem Base64-String
+        scaler_bytes = base64.b64decode(assets["scaler"])
+        scaler = joblib.load(BytesIO(scaler_bytes))
+        feature_names = assets["feature_names"]
+        
+        print("--- CLIENT: Scaler und Feature-Namen vom Server erhalten. ---")
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"FEHLER: Konnte keine Verbindung zum Server herstellen. Stellen Sie sicher, dass der Server läuft. Details: {e}")
+        st.stop()
+
 
     # === Schritt 2: Generiere den Verschlüsselungs-Kontext ===
     print("--- CLIENT: Generiere CKKS-Kontext und Schlüsselpaar... ---")
     context = ts.context(
         ts.SCHEME_TYPE.CKKS,
-        poly_modulus_degree= 8192,  #32768  sehr lange Berechnungszeit (sogar wenn die Features anstatt 13 nur 2 sind)
-        coeff_mod_bit_sizes= [60, 40, 40, 60]  # [60] + [40]*12 + [60]  sehr lange Berechnungszeit (sogar wenn die Features anstatt 13 nur 2 sind)
+        poly_modulus_degree= 8192, #32768  sehr lange Berechnungszeit (sogar wenn die Features anstatt 13 nur 2 sind)
+        coeff_mod_bit_sizes= [60, 40, 40, 60] # [60] + [40]*12 + [60]  sehr lange Berechnungszeit (sogar wenn die Features anstatt 13 nur 2 sind)
     )
-    context.global_scale = 2**40 # wenn unter 20 -> Error: failed to find enough qualifying primes
+    context.global_scale = 2**40  # wenn unter 20 -> Error: failed to find enough qualifying primes
     context.generate_galois_keys()
 
     print("--- CLIENT: Umgebung initialisiert. ---")
@@ -65,9 +86,15 @@ def setup_client_environment():
 st.set_page_config(layout="wide", page_title="Privacy-Preserving GMLVQ")
 st.title("🩺 Privacy-Preserving Heart Disease Classification (GMLVQ)")
 st.markdown(
-    '<p style="color:#a7a1a1;">Dies ist eine Simulation einer getrennten Client-Server-Architektur. '
-    'Der <b>Client</b> (diese UI) verschlüsselt die Daten. Der <b>Server</b> (eine separate Logik) '
-    'berechnet die Distanzen, ohne die Daten oder das Ergebnis zu kennen.</p>',
+    '<p style="color:#a7a1a1;">Dies ist eine getrennte Client-Server-Architektur. </p>',
+    unsafe_allow_html=True
+)
+st.markdown(
+    '<p style="color:#a7a1a1;"> Der <b>Client</b> (diese UI) verschlüsselt die Patienten-Daten und sendet sie über eine HTTP-Anfrage an einen FastAPI-Server.</p>',
+    unsafe_allow_html=True
+)
+st.markdown(
+    '<p style="color:#a7a1a1;">Der <b>Server</b> berechnet die Distanzen, ohne die Daten oder das Ergebnis zu kennen und sendet diese (und Klassenlabels) an den Client in verschlüsselter Form.</p>',
     unsafe_allow_html=True
 )
 
@@ -102,23 +129,50 @@ if st.sidebar.button("Klassifikation durchführen", type="primary"):
     st.markdown('<p style="color:#a7a1a1;"><b>Aktion:</b> Normierte Daten werden homomorph verschlüsselt.</p>', unsafe_allow_html=True)
     st.info("🔒 Die Patientendaten sind jetzt sicher und können das Gerät verlassen.")
 
-    # === Schritt 2: CLIENT -> SERVER - Anfrage senden (simulierter API-Aufruf) ===
-    st.header("2. Simulation der Interaktion")
+    # === Schritt 2: CLIENT -> SERVER - Anfrage senden (API-Aufruf) ===
+    st.header("2. HTTP-Anfrage an FastApi-Server")
     
-    serialized_patient_vector = encrypted_patient_vector.serialize()
-    
+    # Neu: Kodierung der Binärdaten in Base64-Strings
+    serialized_patient_vector_b64 = base64.b64encode(encrypted_patient_vector.serialize()).decode('utf-8')
+            # Wir erstellen einen öffentlichen Kontext, der die riesigen Galois-Schlüssel NICHT enthält.
+            # Das macht die Serialisierung und den Transfer wesentlich schneller. // mit Galois Keys stürzt die App ab
     context_for_server = context.copy()
-        # Wir erstellen einen öffentlichen Kontext, der die riesigen Galois-Schlüssel NICHT enthält.
-        # Das macht die Serialisierung und den Transfer wesentlich schneller. // mit Galois Keys stürzt die App ab
-    context_for_server.make_context_public(generate_galois_keys=False) # Private Key und Galois keys entfernen!!!
-    serialized_public_ckks_context = context_for_server.serialize()
+    context_for_server.make_context_public(generate_galois_keys=False)  # Private Key und Galois keys entfernen!!!
+    serialized_public_ckks_context_b64 = base64.b64encode(context_for_server.serialize()).decode('utf-8')
 
+    payload = {
+        "serialized_encrypted_patient_vector": serialized_patient_vector_b64,
+        "serialized_public_ckks_context": serialized_public_ckks_context_b64
+    }
+
+    # --- ECHTE ZEITMESSUNG BEGINNT HIER ---
+    start_zeit = time.time()
+    
     with st.spinner('Warte auf Antwort vom Server...'):
-        time.sleep(1)
-        # Der Client empfängt jetzt ZWEI Werte vom Server:
-        # 1. Die verschlüsselten Ergebnisse (Distanzen und Labels)
-        # 2. Die Klartext-Relevanzen für die Erklärbarkeit (wird als Säulendiagramm angezeigt)
-        serialized_results_from_server, relevances = process_encrypted_request(serialized_patient_vector, serialized_public_ckks_context)
+        try:
+            # Echter HTTP-Request an den FastAPI-Server
+            response = requests.post("http://localhost:8000/classify_gmlvq", json=payload)
+            response.raise_for_status()
+            
+            response_json = response.json()
+            
+            # Dekodierung der Base64-Strings aus der Server-Antwort
+            serialized_results_from_server = []
+            for ser_dist_b64, label in response_json["serialized_results"]:
+                serialized_results_from_server.append(
+                    (base64.b64decode(ser_dist_b64), label)
+                )
+            
+            relevances = response_json["relevances"]
+
+        except requests.exceptions.RequestException as e:
+            st.error(f"Fehler bei der Server-Kommunikation: {e}")
+            st.stop()
+            
+    # --- ECHTE ZEITMESSUNG ENDET HIER ---
+    end_zeit = time.time()
+    verstrichene_zeit = end_zeit - start_zeit
+    st.info(f"Gesamtzeit für Client-Server-Kommunikation: **{verstrichene_zeit:.6f}** Sekunden.")
     
     st.markdown('<p style="color:#a7a1a1;">📤 <b>Client an Server:</b> Sende verschlüsselten Datenvektor und öffentlichen Kontext.</p>', unsafe_allow_html=True)
     st.markdown('<p style="color:#a7a1a1;">... Server arbeitet blind auf den Daten ...</p>', unsafe_allow_html=True)
@@ -166,9 +220,15 @@ if st.sidebar.button("Klassifikation durchführen", type="primary"):
     st.divider()
     st.subheader("💡 Erklärbarkeit des GMLVQ-Modells")
     st.markdown(
-        '<p style="color:#a7a1a1;">GMLVQ lernt, welche Merkmale für die Klassifikation wichtig sind. '
-        'Das folgende Diagramm zeigt die vom Modell gelernte Wichtigkeit (Relevanz) für jedes Merkmal. '
-        'Hohe Balken bedeuten, dass das Merkmal einen großen Einfluss auf das Klassifikations-Ergebnis hat.</p>',
+        '<p style="color:#a7a1a1;">GMLVQ lernt, welche Merkmale für die Klassifikation wichtig sind.</p>',
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        '<p style="color:#a7a1a1;">Das folgende Diagramm zeigt die vom Modell gelernte Wichtigkeit (Relevanz) für jedes Merkmal.</p>',
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        '<p style="color:#a7a1a1;">Hohe Balken bedeuten, dass das Merkmal einen großen Einfluss auf das Klassifikations-Ergebnis hat.</p>',
         unsafe_allow_html=True
     )
 
@@ -189,10 +249,10 @@ if st.sidebar.button("Klassifikation durchführen", type="primary"):
         title='Wichtigkeit der Merkmale'
     ).configure_title(
         color='rgb(75, 104, 159)', 
-        fontSize=16    
+        fontSize=16     
     )
 
     # 4. Zeige das Diagramm in der Streamlit-App an
     st.altair_chart(chart, use_container_width=True)
 
-    # TODO: PDF-Bericht
+     # TODO: PDF-Bericht
