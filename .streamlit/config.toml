@@ -1,2 +1,5 @@
-[compatibility]
-python_version = 3.11.0
+[tool.streamlit]
+python_version = "3.9" 
+
+[logger]
+level = "info"
