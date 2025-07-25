@@ -12,7 +12,10 @@
 # 1. Einmaliges Trainieren eines GLVQ-Machine-Learning-Modells, um "Prototypen"
 #    für die Klassen "gesund" und "krank" zu lernen. Diese Prototypen sind die
 #    einzige Wissensbasis des Servers.
-# 2. Bereitstellen eines API-Endpunkts, der verschlüsselte Daten vom Client annimmt.
+# 2. Bereitstellen von zwei API-Endpunkten:
+#    - /assets: Gibt die initialen Daten (Scaler, Feature-Namen) zurück.
+#    - /classify: Nimmt verschlüsselte Patientendaten an und gibt verschlüsselte
+#                 Klassifikationsergebnisse zurück.
 # 3. Diese Anfrage enthält homomorph verschlüsselte Patientendaten. Der Server
 #    führt "blind" Berechnungen (Distanzmessungen) auf diesen verschlüsselten
 #    Daten durch.
@@ -36,7 +39,9 @@ import tenseal as ts
 from sklearn.preprocessing import MinMaxScaler
 from sklearn_lvq import GlvqModel
 from sklearn.ensemble import IsolationForest
-import base64 # Neu: Import für die Base64-Kodierung
+import base64 # Import für die Base64-Kodierung
+import joblib #  Zum Serialisieren des Scalers
+from io import BytesIO
 
 # --- Modell-Training und Asset-Laden ---
 # Diese Funktion wird einmalig beim Start des Servers ausgeführt
@@ -124,6 +129,23 @@ class EncryptedDataRequest(BaseModel):
 # --- FastAPI App ---
 app = FastAPI()
 
+
+# Endpunkt zum Abrufen der initialen Assets
+@app.get("/assets") # Endpunkt. /assets
+def get_assets():
+    """
+    Stellt den fitten Scaler und die Feature-Namen bereit.
+    Der Scaler wird serialisiert, um ihn über HTTP senden zu können.
+    """
+    print("--- SERVER: Sende initiale Assets an Client... ---")
+    scaler_bytes = BytesIO()
+    joblib.dump(SCALER, scaler_bytes)
+    scaler_base64 = base64.b64encode(scaler_bytes.getvalue()).decode('utf-8')
+    return {
+        "scaler": scaler_base64,
+        "feature_names": FEATURE_NAMES
+    }
+
 @app.post("/classify")
 def process_encrypted_request(request: EncryptedDataRequest):
     """
@@ -145,7 +167,7 @@ def process_encrypted_request(request: EncryptedDataRequest):
     # Sicherheits- und Funktions-Check des erhaltenen Kontexts
     print("\n--- SERVER: Überprüfe den vom Client erhaltenen Kontext... ---")
     if public_context.has_public_key():
-        print("-> STATUS: ✅ Der Kontext enthält die benötigten öffentlichen Schlüssel (Galois-Keys)")
+        print("-> STATUS: ✅ Der Kontext enthält die benötigten öffentlichen Schlüssel")
     else:
         print("-> STATUS: ❌ WARNUNG: Der Kontext enthält keine öffentlichen Schlüssel")
     
@@ -175,4 +197,4 @@ def process_encrypted_request(request: EncryptedDataRequest):
     return {"serialized_results": serialized_results}
 
 # den Server in der Konsole starten:
-# uvicorn server_fastapi:app --reload
+# uvicorn server:app --reload
