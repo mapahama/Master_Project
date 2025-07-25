@@ -1,20 +1,20 @@
 # Kern-Bibliotheken für Datenverarbeitung und Streamlit
-streamlit==1.44.1
-pandas==2.2.3
-numpy==1.26.4
+streamlit==1.30.0
+pandas==1.5.3
+numpy==1.24.2
 
 # Machine Learning - GMLVQ
-scikit-learn==1.6.1
+scikit-learn==1.2.2
 scipy==1.10.1
 sklearn-lvq==1.1.1
-joblib==1.4.2 
-threadpoolctl==3.6.0 
+joblib==1.2.0
+threadpoolctl==3.1.0 
 
 # CKKS / Homomorphe Verschlüsselung
 tenseal==0.3.15
 
 # Andere Bibliotheken
-altair==5.5.0
-plotly==6.2.0
-matplotlib==3.10.1
-seaborn==0.13.2
+altair==5.0.1
+plotly==5.13.1
+matplotlib==3.7.2
+seaborn==0.12.2
