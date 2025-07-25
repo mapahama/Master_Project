@@ -1,15 +1,18 @@
 
+# Um die App zu starten müssen 2 separate Konsolen verwendet werden (eine für Client und die andere für Server)
+# Erstmal den Server starten, durch den Befehl:
+# uvicorn server:app --reload
+
 # =================================================================================
 # SERVER-SEITIGE LOGIK
 # =================================================================================
 #
-# Dieser Code simuliert die serverseitige Komponente einer Client-Server-Anwendung.
+# Dieser Code implementiert die serverseitige Komponente als echten FastAPI-Webserver.
 # Die Hauptaufgaben dieses Servers sind:
 # 1. Einmaliges Trainieren eines GLVQ-Machine-Learning-Modells, um "Prototypen"
 #    für die Klassen "gesund" und "krank" zu lernen. Diese Prototypen sind die
 #    einzige Wissensbasis des Servers.
-# 2. Bereitstellen einer Funktion (`process_encrypted_request`), die eine Anfrage
-#    von einem Client entgegennimmt.
+# 2. Bereitstellen eines API-Endpunkts, der verschlüsselte Daten vom Client annimmt.
 # 3. Diese Anfrage enthält homomorph verschlüsselte Patientendaten. Der Server
 #    führt "blind" Berechnungen (Distanzmessungen) auf diesen verschlüsselten
 #    Daten durch.
@@ -17,35 +20,30 @@
 #    jemals die originalen Patientendaten oder das finale Klassifikationsergebnis
 #    zu kennen.
 #
-# Die Sicherheit wird dadurch gewährleistet, dass der Server nie Zugriff auf den
-# geheimen Schlüssel (Secret Key) des Clients hat.
+#  Wichtig: Der Server läuft als eigenständiger Prozess und kommuniziert über HTTP.
+
+#  Wichtig: Die Sicherheit wird dadurch gewährleistet, dass der Server nie Zugriff auf den
+#  geheimen Schlüssel (Secret Key) des Clients hat.
+#
 # =================================================================================
 
-
 # --- Bibliotheken importieren ---
-import streamlit as st # Wird hier nur für die Caching-Funktion @st.cache_resource genutzt
+from fastapi import FastAPI
+from pydantic import BaseModel
 import pandas as pd
 import numpy as np
 import tenseal as ts
-
 from sklearn.preprocessing import MinMaxScaler
 from sklearn_lvq import GlvqModel
 from sklearn.ensemble import IsolationForest
+import base64 # Neu: Import für die Base64-Kodierung
 
-
-@st.cache_resource
+# --- Modell-Training und Asset-Laden ---
+# Diese Funktion wird einmalig beim Start des Servers ausgeführt
 def get_server_assets():
     """
     Simuliert das Laden der serverseitigen Assets (trainiertes Modell).
-    Diese Funktion wird nur einmal ausgeführt und die Ergebnisse werden zwischengespeichert,
-    um das teure Modelltraining nicht bei jeder Anfrage wiederholen zu müssen.
-    In einer echten Anwendung würde man hier ein bereits fertig trainiertes Modell
-    von der Festplatte laden.
     """
-    #####################################################
-    # --- Schritt 1: Daten laden und vorverarbeiten ---
-    #####################################################
-
     print("--- SERVER: Lade Datensatz für das einmalige Training... ---")
     # Pfad zum Datensatz 
     df = pd.read_csv("../heart_data_pretty.csv", sep='\s+')
@@ -54,6 +52,7 @@ def get_server_assets():
     # Feature-Namen extrahieren, damit der Client sie erhalten kann
     feature_names = X.columns.tolist()
     
+    # Daten vorverarbeiten
     X.replace('?', np.nan, inplace=True)
     X = X.apply(pd.to_numeric, errors='coerce')
     X.fillna(X.median(), inplace=True)
@@ -71,7 +70,7 @@ def get_server_assets():
 
     # Isolation Forest initialisieren und anwenden
     # contamination legt den erwarteten Anteil der Ausreißer fest
-    iso_forest = IsolationForest(contamination=0.08, random_state=42) # 8%
+    iso_forest = IsolationForest(contamination=0.08, random_state=42)
     predictions = iso_forest.fit_predict(X_scaled_for_iso) # -1 für Ausreißer, 1 für Inlier
 
     # Indizes der als Ausreißer markierten Datenpunkte
@@ -87,7 +86,7 @@ def get_server_assets():
     # Entferne die Ausreißer aus X und y
     X_clean = X.drop(X.index[outlier_indices])
     y_clean = y_original.drop(y_original.index[outlier_indices])
-
+    
     print(f"Neue Datenform nach Außreiser-Bereinigung (X_clean): {X_clean.shape}")
     print(f"Neue Datenform nach Außreiser-Bereinigung (y_clean): {y_clean.shape}")
 
@@ -97,12 +96,11 @@ def get_server_assets():
 
     # Ziel: alle Merkmale  auf eine ähnliche Skala (Bereich [-1,1]) zu bringen!
     scaler = MinMaxScaler(feature_range=(-1, 1))
-    
     # Skaliere die BEREINIGTEN Daten 'X_clean'
     X_scaled = scaler.fit_transform(X_clean)
     # Verwende die BEREINIGTE Zielvariable 'y_clean'
     y_binary_np = y_clean.to_numpy()
-
+    
     print("--- SERVER: Trainiere GLVQ-Modell... ---")
     server_model = GlvqModel(prototypes_per_class=1, beta=3, gtol=1e-5, random_state=42)
     server_model.fit(X_scaled, y_binary_np)
@@ -111,25 +109,38 @@ def get_server_assets():
     proto_labels = server_model.c_w_
     
     print("--- SERVER: Modell trainiert und Assets geladen. ---")
-    # Gibt alle Assets zurück, die von anderen Teilen der Anwendung benötigt werden könnten. // prototypes werden vom Client NICHT abgerufen
+     # Gibt alle Assets zurück, die von anderen Teilen der Anwendung benötigt werden könnten. // prototypes werden vom Client NICHT abgerufen
     return prototypes, proto_labels, scaler, feature_names
 
+# --- Globale Variable für die Assets ---
+PROTOTYPES, PROTO_LABELS, SCALER, FEATURE_NAMES = get_server_assets()
 
+# --- Server-Modell für die HTTP-Anfrage ---
+class EncryptedDataRequest(BaseModel):
+    # Die Daten werden jetzt als Base64-kodierte Strings erwartet
+    serialized_encrypted_patient_vector: str
+    serialized_public_ckks_context: str
+    
+# --- FastAPI App ---
+app = FastAPI()
 
-def process_encrypted_request(serialized_encrypted_patient_vector, serialized_public_ckks_context):
+@app.post("/classify")
+def process_encrypted_request(request: EncryptedDataRequest):
     """
-    Simuliert einen Server-API-Endpunkt.
-    Diese Funktion ist die zentrale Logik des Servers, die auf Anfragen des Clients reagiert.
+    Diese Funktion ist die zentrale Logik des Servers, die auf HTTP-Anfragen des Clients reagiert.
     Sie nimmt serialisierte, verschlüsselte Daten entgegen, verarbeitet sie blind und
     gibt serialisierte, verschlüsselte Ergebnisse zurück.
     """
-    # 1. Lade die Server-Assets (Prototypen und deren Labels)
-    # Die Funktion gibt 4 Werte zurück. Wir benötigen hier nur die ersten beiden
-    # und ignorieren den Rest mit dem Unterstrich-Platzhalter "_".
-    prototypes, proto_labels, _, _ = get_server_assets()
-
-    # 2. Rekonstruiere den öffentlichen CKKS-Kontext aus den vom Client gesendeten Daten
-    public_context = ts.context_from(serialized_public_ckks_context)
+    # Dekodierung der Base64-Strings zurück in Bytes
+    # Patienten-Vektor  und CKKS-Kontext vom Client
+    serialized_vector_bytes = base64.b64decode(request.serialized_encrypted_patient_vector)
+    serialized_context_bytes = base64.b64decode(request.serialized_public_ckks_context)
+    
+    # Rekonstruiere den öffentlichen CKKS-Kontext vom Client
+    public_context = ts.context_from(serialized_context_bytes)
+    
+    # 2. Rekonstruiere den verschlüsselten Patienten-Vektor vom Client
+    encrypted_patient_vector = ts.ckks_vector_from(public_context, serialized_vector_bytes)
     
     # Sicherheits- und Funktions-Check des erhaltenen Kontexts
     print("\n--- SERVER: Überprüfe den vom Client erhaltenen Kontext... ---")
@@ -144,21 +155,24 @@ def process_encrypted_request(serialized_encrypted_patient_vector, serialized_pu
         print("-> STATUS: ❌ SICHERHEITSRISIKO: Der Kontext enthält fälschlicherweise einen geheimen Schlüssel!")
     print("----------------------------------------------------\n")
 
-    # 3. Rekonstruiere den verschlüsselten Vektor aus den vom Client gesendeten Daten
-    encrypted_patient_vector = ts.ckks_vector_from(public_context, serialized_encrypted_patient_vector)
-    
-    # 4. Führe die homomorphe Distanzberechnung für jeden Prototyp durch
+
+    # 3. Führe die homomorphe Distanzberechnung für jeden Prototyp durch
     encrypted_distances = []
-    for p_vector in prototypes:
+    for p_vector in PROTOTYPES:
         enc_diff = encrypted_patient_vector - p_vector
         enc_squared_diff = enc_diff.pow(2)
-        enc_distance = enc_squared_diff.sum() # dies ist die Quadrierte Euklidische Distanz // Alle 13 Merkmale innerhalb des Vektors "enc_squared_diff" werden zu einem einzigen Wert addiert.
+        enc_distance = enc_squared_diff.sum()  # dies ist die Quadrierte Euklidische Distanz // Alle 13 Merkmale innerhalb des Vektors "enc_squared_diff" werden zu einem einzigen Wert addiert.
         encrypted_distances.append(enc_distance)
-
-    # 5. Bereite die Ergebnisse für die Rücksendung an den Client vor. (Serializieren von CKKS-Vektoren ist notwendig für Client/Server Kommunikation über das Netz)
+    
+    # 4. Bereite die Ergebnisse für die Rücksendung vor (Serializieren von CKKS-Vektoren ist notwendig für Client/Server Kommunikation über das Netz)
     serialized_results = []
-    for vec, label in zip(encrypted_distances, proto_labels):
-        serialized_results.append((vec.serialize(), label))
-
+    for vec, label in zip(encrypted_distances, PROTO_LABELS):
+        # Jedes serialisierte Ergebnis muss ebenfalls als Base64-kodierter String gespeichert werden
+        serialized_vec = base64.b64encode(vec.serialize()).decode('utf-8')
+        serialized_results.append([serialized_vec, int(label)])
+        
     print("--- SERVER: Distanzberechnung abgeschlossen, sende Ergebnisse zurück. ---")
-    return serialized_results
+    return {"serialized_results": serialized_results}
+
+# den Server in der Konsole starten:
+# uvicorn server_fastapi:app --reload
