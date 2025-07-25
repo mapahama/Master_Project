@@ -35,14 +35,16 @@ import tenseal as ts
 import time
 import plotly.express as px
 import requests
-import base64 # Neu: Import für die Base64-Kodierung
+import base64 # Import für die Base64-Kodierung
+import joblib # Zum Deserialisieren des Scalers
+from io import BytesIO
 
 # --- Server-Kommunikation simulieren ---
 @st.cache_resource
 def setup_client_environment():
     """
     Bereitet die client-seitige Umgebung vor, indem der Scaler und Feature-Namen
-    vom Server angefordert werden. Auch der CKKS-Kontext wird hier generiert.
+    vom Server durch HTTP-Anfrage angefordert werden. Auch der CKKS-Kontext wird hier generiert.
 
     WICHTIG: Der Client kennt das Modell oder die Prototypen NICHT.
     Er benötigt nur den Scaler, um Daten korrekt vorzubereiten, und den CKKS-Kontext
@@ -52,12 +54,28 @@ def setup_client_environment():
 
     # === Schritt 1: Lade benötigte Assets vom Server ===
     # Der Client "fragt" den FastAPI-Server durch eine echte HTTP-Anfrage  nach den öffentlichen Assets, die er benötigt.
-    # Hier sind das der gefittete Scaler und die Namen der Features für die UI.
+    # Das sind das der gefittete Scaler und die Namen der Features für die UI.
     # Die Prototypen und ihre Labels werden bewusst ignoriert (mit _), da der
     # Client sie nicht kennen darf.
+
+    # === Schritt 2: Echte HTTP-Anfrage an den Server, um die Assets abzurufen ===
     print("--- CLIENT: Frage Scaler und Feature-Namen vom Server an... ---")
-    from server_fastapi import get_server_assets
-    _, _, scaler, feature_names = get_server_assets()
+    try:
+        # HTTP-Anfrage zu Endpunkt /assets
+        response = requests.get("http://localhost:8000/assets")
+        response.raise_for_status()
+        assets = response.json()
+        
+        # Deserialisieren des Scalers aus dem Base64-String
+        scaler_bytes = base64.b64decode(assets["scaler"])
+        scaler = joblib.load(BytesIO(scaler_bytes))
+        feature_names = assets["feature_names"]
+        
+        print("--- CLIENT: Scaler und Feature-Namen vom Server erhalten. ---")
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"FEHLER: Konnte keine Verbindung zum Server herstellen. Stellen Sie sicher, dass der Server läuft. Details: {e}")
+        st.stop()
 
     # === Schritt 2: Generiere den Verschlüsselungs-Kontext ===
     # Dieser Kontext enthält alle Parameter für die CKKS-Verschlüsselung.
@@ -85,9 +103,13 @@ st.set_page_config(layout="wide", page_title="Privacy-Preserving GLVQ")
 st.title("🩺 Privacy-Preserving Heart Disease Classification")
 # # Einleitungstext, der die Architektur erklärt.
 st.write(
-    "Dies ist eine  getrennte Client-Server-Architektur. "
-    "Der **Client** (diese UI) verschlüsselt die Daten und sendet sie über eine HTTP-Anfrage an einen separaten FastAPI-Server."
-    "Der **Server** berechnet die Distanzen, ohne die Daten oder das Ergebnis zu kennen."
+    "Dies ist eine  getrennte Client-Server-Architektur."
+)
+st.write(
+    "Der **Client** (diese UI) verschlüsselt die Patienten-Daten und sendet sie über eine HTTP-Anfrage an einen  FastAPI-Server."
+)
+st.write(
+    "Der **Server** berechnet die Distanzen, ohne die Daten oder das Ergebnis zu kennen und sendet diese (und Klassenlabels) an den Client in verschlüsselter Form."
 )
 
 #  Initialisiere die Client-Umgebung.
