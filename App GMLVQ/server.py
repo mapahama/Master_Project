@@ -1,17 +1,20 @@
+# Um die App zu starten müssen 2 separate Konsolen verwendet werden (eine für Client und die andere für Server)
+# Erstmal den Server starten, durch den Befehl:
+# uvicorn server:app --reload
+
 # =================================================================================
 # SERVER-SEITIGE LOGIK FÜR GMLVQ (homomorph mit CKKS)
 # =================================================================================
-# Dieser Code simuliert die serverseitige Komponente einer Client-Server-Anwendung
-# für eine  Klassifikation mit dem GMLVQ-Algorithmus.
-#
+# Dieser Code implementiert die serverseitige Komponente als echten FastAPI-Webserver
+#  für eine Client-Server App, die Patientendaten-Klassifikation mit dem GMLVQ-Algorithmus durchführt.
 # Die Hauptaufgaben dieses Servers sind:
 # 1. Einmaliges Trainieren eines GMLVQ-Modells beim ersten Start und Bereitstellen
-#    der notwendigen, nicht-geheimen "Assets" (Scaler, Feature-Namen).
-# 2. Bereitstellen einer API-ähnlichen Funktion (`process_encrypted_request`), die
-#    Anfragen vom Client entgegennimmt.
+#    der notwendigen, nicht-geheimen "Assets" (Scaler, Feature-Namen).
+# 2. Bereitstellen einer API-Funktion (`process_encrypted_request`), die
+#    Anfragen vom Client entgegennimmt.
 # 3. Empfangen eines homomorph verschlüsselten Patientendaten-Vektors vom Client.
-# 4. Durchführung der  GMLVQ-Distanzberechnung auf den verschlüsselten
-#    Daten. Dies ist eine "blinde" Berechnung, da der Server die Daten nie entschlüsselt.
+# 4. Durchführung der GMLVQ-Distanzberechnung auf den verschlüsselten
+#    Daten. Dies ist eine "blinde" Berechnung, da der Server die Daten nie entschlüsselt.
 # 5. Zurücksenden der verschlüsselten Ergebnisse und der globalen Modell-Relevanzen an den Client.
 #
 # Der Server kennt zu keinem Zeitpunkt die geheimen Patientendaten oder das finale
@@ -20,49 +23,34 @@
 
 
 # --- Bibliotheken importieren ---
-import streamlit as st
+from fastapi import FastAPI
+from pydantic import BaseModel
 import pandas as pd
 import numpy as np
 import tenseal as ts
 import os
+import joblib
+from io import BytesIO
+import base64
 
 from sklearn.preprocessing import MinMaxScaler
 from sklearn_lvq import GmlvqModel
 from sklearn.ensemble import IsolationForest
 
 
-
-@st.cache_resource
 def get_server_assets():
     """
     Simuliert das Laden und Trainieren der serverseitigen Assets.
     Diese Funktion wird dank Caching nur einmal ausgeführt. In einer realen Anwendung
     würde man hier ein bereits fertig trainiertes Modell laden, anstatt es neu zu trainieren.
     Gibt die Prototypen, deren Labels, den Scaler, die Feature-Namen, die
-    Omega-Matrix und die berechneten Merkmals-Relevanzen zurück.
+    Lambda-Matrix und die berechneten Merkmals-Relevanzen zurück.
     """
     # --- Schritt 1: Daten laden und vorverarbeiten ---
     print("--- SERVER: Lade Datensatz für das einmalige Training... ---")
-    # df = pd.read_csv("heart_data_pretty.csv", sep='\s+')
+    df = pd.read_csv("../heart_data_pretty.csv", sep='\s+')
 
-    # Neu Hosting
-    # Holt das Verzeichnis, in dem sich das aktuelle Skript befindet
-    script_dir = os.path.dirname(__file__)
-
-    # Erstellt den vollständigen Pfad zur CSV-Datei
-    # Da die CSV im selben Verzeichnis wie das Skript ist, ist es direkt der Dateiname
-    csv_file_path = os.path.join(script_dir, "heart_data_pretty.csv")
-
-    try:
-        df = pd.read_csv(csv_file_path, sep='\s+')
-        st.success("CSV-Datei erfolgreich geladen!")
-    except FileNotFoundError:
-        st.error(f"Fehler: Die Datei 'heart_data_pretty.csv' wurde nicht gefunden unter: {csv_file_path}")
-        st.info("Bitte stelle sicher, dass die CSV-Datei im selben Ordner wie dein Streamlit-Skript liegt.")
-    except Exception as e:
-        st.error(f"Ein unerwarteter Fehler ist aufgetreten: {e}")
-    # Neu Hosting
-
+    # Daten vorverarbeiten
     X = df.drop(columns=["target"]).copy()
     y = (df["target"] > 0).astype(int)
     feature_names = X.columns.tolist()
@@ -130,19 +118,45 @@ def get_server_assets():
     return prototypes, proto_labels, scaler, feature_names, omega, relevances
 
 
-def process_encrypted_request(serialized_vector, serialized_public_context):
-    """
-    Nimmt vom Client den verschlüsselten Patientenvektor und den öffentlichen CKKS -Kontext
-    entgegen, wendet homomorph die Omega-Transformation an und berechnet die Distanzen
-    zu den GMLVQ-Prototypen. Rückgabe: Liste verschlüsselter Distanzen, Klassenlabel
-    und die globalen Merkmals-Relevanzen.
-    """
-    # Lade die Server-Assets (Modell-Parameter) aus dem Cache.
-    # Empfange auch die 'relevances' (Erklärbarkeit im UI)
-    prototypes, proto_labels, _, _, omega, relevances = get_server_assets()
+# --- Globale Variablen für die Assets ---
+PROTOTYPES, PROTO_LABELS, SCALER, FEATURE_NAMES, OMEGA, RELEVANCES = get_server_assets()
 
-    # Rekonstruiere den öffentlichen CKKS-Kontext aus den vom Client gesendeten Daten.
-    public_context = ts.context_from(serialized_public_context)
+# --- Server-Modell für die Anfrage ---
+class EncryptedDataRequest(BaseModel):
+    # Die Daten werden als Base64-kodierte Strings erwartet
+    serialized_encrypted_patient_vector: str
+    serialized_public_ckks_context: str
+    
+# --- FastAPI App ---
+app = FastAPI()
+
+# Endpunkt zum Abrufen der initialen Assets
+@app.get("/assets_gmlvq") # Endpunkt: /assets_gmlvq
+def get_assets_gmlvq():
+    """
+    Stellt den fitten Scaler und die Feature-Namen bereit (für Client HTTP-Anfrage).
+    """
+    print("--- SERVER: Sende initiale Assets an Client... ---")
+    scaler_bytes = BytesIO()
+    joblib.dump(SCALER, scaler_bytes)
+    scaler_base64 = base64.b64encode(scaler_bytes.getvalue()).decode('utf-8')
+    return {
+        "scaler": scaler_base64,
+        "feature_names": FEATURE_NAMES
+    }
+
+@app.post("/classify_gmlvq") # Endpunkt: /classify_gmlvq
+def process_encrypted_request_api(request: EncryptedDataRequest):
+    """
+    API-Endpunkt zur Verarbeitung verschlüsselter Daten.
+    """
+    # Dekodierung der Base64-Strings zurück in Bytes (Patientendaten und CKKS-Context)
+    serialized_vector_bytes = base64.b64decode(request.serialized_encrypted_patient_vector)
+    serialized_context_bytes = base64.b64decode(request.serialized_public_ckks_context)
+    
+    # Rekonstruiere den öffentlichen CKKS-Kontext
+    public_context = ts.context_from(serialized_context_bytes)
+    
 
     # Sicherheits-Check: Stelle sicher, dass der Kontext öffentlich ist und keinen geheimen Schlüssel enthält.
     print("\n--- SERVER: Kontextüberprüfung ---")
@@ -150,19 +164,19 @@ def process_encrypted_request(serialized_vector, serialized_public_context):
     print("-> Secret Key vorhanden (sollte False sein):", public_context.has_secret_key())
     print("----------------------------------------------------")
 
-    # Rekonstruiere den verschlüsselten (serializiert) Vektor aus den vom Client gesendeten Daten.
-    encrypted_patient_vector = ts.ckks_vector_from(public_context, serialized_vector)
-
+    # Rekonstruiere den verschlüsselten Vektor
+    encrypted_patient_vector = ts.ckks_vector_from(public_context, serialized_vector_bytes)
+    
     # --- A) Homomorphe Projektion des Patientendatenvektors: Enc(Ωξ) ---
     encrypted_embedded = []
-    for omega_row in omega:
+    for omega_row in OMEGA:
         dot_product = encrypted_patient_vector.dot(omega_row.tolist())
         encrypted_embedded.append(dot_product)
 
     # --- B) Berechnung der Distanz zu jedem Prototyp im projizierten Raum ---
     encrypted_distances = []
-    for i, proto in enumerate(prototypes):
-        embedded_proto = omega @ proto
+    for i, proto in enumerate(PROTOTYPES):
+        embedded_proto = OMEGA @ proto
         diff_enc = []
         for enc_val, p_val in zip(encrypted_embedded, embedded_proto):
             diff_enc.append(enc_val - p_val)
@@ -175,11 +189,15 @@ def process_encrypted_request(serialized_vector, serialized_public_context):
 
     # --- Ergebnis für den Rückversand an den Client vorbereiten ---
     serialized_results = []
-    for vec, label in zip(encrypted_distances, proto_labels):
-        serialized_results.append((vec.serialize(), label))
+    for vec, label in zip(encrypted_distances, PROTO_LABELS):
+        # Jedes serialisierte Ergebnis muss ebenfalls als Base64-kodierter String gespeichert werden
+        serialized_vec = base64.b64encode(vec.serialize()).decode('utf-8')
+        serialized_results.append([serialized_vec, int(label)])
 
     print("--- SERVER: Distanzberechnung abgeschlossen. ---")
     
     # Gib die verschlüsselten Distanzen UND die Klartext-Relevanzen zurück.
-    # .tolist() wandelt das NumPy-Array in eine normale Python-Liste um, was für APIs üblich ist.
-    return serialized_results, relevances.tolist()
+    return {"serialized_results": serialized_results, "relevances": RELEVANCES.tolist()}
+
+# Starte  den Server in der Konsole:
+# uvicorn server:app --reload
