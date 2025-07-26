@@ -167,14 +167,20 @@ def process_encrypted_request(request: EncryptedDataRequest):
     # Sicherheits- und Funktions-Check des erhaltenen Kontexts
     print("\n--- SERVER: Überprüfe den vom Client erhaltenen Kontext... ---")
     if public_context.has_public_key():
-        print("-> STATUS: ✅ Der Kontext enthält die benötigten öffentlichen Schlüssel")
+        print("-> STATUS: ✅ Der Kontext enthält die benötigten öffentlichen Schlüssel") # Output: Ja
     else:
         print("-> STATUS: ❌ WARNUNG: Der Kontext enthält keine öffentlichen Schlüssel")
     
     if not public_context.has_secret_key():
-        print("-> STATUS: ✅ Der Kontext enthält wie erwartet KEINEN geheimen Schlüssel.")
+        print("-> STATUS: ✅ Der Kontext enthält wie erwartet KEINEN geheimen Schlüssel.") # Output: Ja
     else:
         print("-> STATUS: ❌ SICHERHEITSRISIKO: Der Kontext enthält fälschlicherweise einen geheimen Schlüssel!")
+    # Zusätzlicher Check für Relinearisierungsschlüssel (Relin-Keys)
+    # TenSEAL implementiert Relin-Keys automatisch in has_public_key()
+    if public_context.has_relin_keys():
+        print("-> STATUS: ✅ Der Kontext enthält Relinearisierungsschlüssel.") # Output: Ja
+    else:
+        print("-> STATUS: ❌ FEHLER: Relinearisierungsschlüssel fehlen. Multiplikationen werden fehlschlagen.")
     print("----------------------------------------------------\n")
 
 
