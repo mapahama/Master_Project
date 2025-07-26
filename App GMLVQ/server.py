@@ -160,8 +160,9 @@ def process_encrypted_request_api(request: EncryptedDataRequest):
 
     # Sicherheits-Check: Stelle sicher, dass der Kontext öffentlich ist und keinen geheimen Schlüssel enthält.
     print("\n--- SERVER: Kontextüberprüfung ---")
-    print("-> Public Key vorhanden:", public_context.has_public_key())
-    print("-> Secret Key vorhanden (sollte False sein):", public_context.has_secret_key())
+    print("-> Public Key vorhanden:", public_context.has_public_key()) # Output: Ja
+    print("-> Relinearisierungsschlüssel vorhanden :", public_context.has_relin_keys()) # Output: Ja
+    print("-> Secret Key vorhanden (sollte False sein):", public_context.has_secret_key()) # Output: Nein
     print("----------------------------------------------------")
 
     # Rekonstruiere den verschlüsselten Vektor
