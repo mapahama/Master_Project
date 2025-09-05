@@ -194,9 +194,9 @@ if st.sidebar.button("Klassifikation durchführen", type="primary"):
     if not is_certain:
         st.warning(
             f"**Warnung: Unsichere Modell-Entscheidung**\n\n"
-            f"Der entschlüsselte Ergebniswert (Label) von **{decrypted_winner_label:.4f}** liegt in einem Bereich, "
-            f"in dem die Zuverlässigkeit der Klassifikation gering ist. "
-            f"Das Ergebnis sollte mit Vorsicht interpretiert werden.",
+            f"Der entschlüsselte Ergebniswert (Label) von **{decrypted_winner_label:.4f}** liegt nicht nah genug "
+            f"an einem eindeutigen Zielwert (0 für GESUND, 1 für KRANK).\n\n"
+            f"Das Ergebnis sollte mit Vorsicht interpretiert werden!",
             icon="⚠️"
         )
     # #############################################################################################
