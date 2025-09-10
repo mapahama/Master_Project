@@ -54,7 +54,7 @@ def train_and_evaluate_plaintext(X, y):
     X_test_scaled = scaler.transform(X_test)
 
     # Initialisiere und trainiere das GMLVQ-Modell
-    gmlvq = GmlvqModel(prototypes_per_class=1, random_state=42)
+    gmlvq = GmlvqModel(prototypes_per_class=2, random_state=42)
     gmlvq.fit(X_train_scaled, y_train)
 
     # Mache Vorhersagen
@@ -86,13 +86,13 @@ def evaluate_encrypted(gmlvq_model, X_test_scaled, y_test):
     context = ts.context(
         ts.SCHEME_TYPE.CKKS,
         poly_modulus_degree=8192,
-        coeff_mod_bit_sizes=[50, 40, 40, 50]  # liefert schlechtere Klassifikationsgenauigkeit  [30, 20, 20, 30]
+        coeff_mod_bit_sizes=[60, 40, 40, 60]  # liefert schlechtere Klassifikationsgenauigkeit  [30, 20, 20, 30]
     )
     # Erzeuge Galois-Schlüssel, die für Rotationsoperationen benötigt werden
     context.generate_galois_keys()
     # Setze den globalen Skalierungsfaktor für die Dezimalgenauigkeit
     context.global_scale = 2**40 # liefert schlechtere Klassifikationsgenauigkeit 2**20
-    
+
     print("TenSEAL-Kontext erstellt.\n")
     print("4. Evaluiere das Modell auf verschlüsselten Testdaten...")
     
