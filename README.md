@@ -40,7 +40,7 @@ Three system variants have been implemented:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/<your-username>/Master_Project.git
+   git clone https://github.com/mapahama/Master_Project.git
    cd Master_Project
 2. Python version 3.11 or higher is needed
    todo
