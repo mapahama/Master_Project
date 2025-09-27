@@ -57,11 +57,11 @@ Three system variants have been implemented:
    # Linux/Mac
    source venv311/bin/activate
 5. Configure VS Code to use venv311
-   ```bash
+   
     1) In VS Code, press Ctrl+Shift+P.
     2) Search for “Python: Select Interpreter” and select it.
     3) Choose the interpreter from your venv311 folder
-      (e.g. .\venv311\Scripts\python.exe on Windows).
+       (e.g. .\venv311\Scripts\python.exe on Windows).
 6. Install Libraries and Dependencies
    ```bash
    pip install -r requirements.txt
