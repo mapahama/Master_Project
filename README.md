@@ -42,9 +42,10 @@ Three system variants have been implemented:
    ```bash
    git clone https://github.com/mapahama/Master_Project.git
    cd Master_Project
-2. Python version 3.11 or higher is needed
-   todo
-3. Python Virtual Environment
+2. Python version 3.11 or higher is required
+   ```bash
+   https://www.python.org/downloads/release/python-3110/
+3. Python Virtual Environment is required
    ```bash
    # Windows
    python -m venv venv311 
@@ -58,9 +59,9 @@ Three system variants have been implemented:
    source venv311/bin/activate
 5. Configure VS Code to use venv311
    
-    1) In VS Code, press Ctrl+Shift+P.
-    2) Search for “Python: Select Interpreter” and select it.
-    3) Choose the interpreter from your venv311 folder
+    1. In VS Code, press Ctrl+Shift+P.
+    2. Search for “Python: Select Interpreter” and select it.
+    3. Choose the interpreter from your venv311 folder
        (e.g. .\venv311\Scripts\python.exe on Windows).
 6. Install Libraries and Dependencies
    ```bash
