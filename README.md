@@ -48,7 +48,7 @@ Three system variants have been implemented:
 3. Python Virtual Environment is required
    ```bash
    # Windows
-   python -m venv venv311 
+   py -3.11 -m venv venv311
    # Linux/Mac
    python3.11 -m venv venv311
 4. Activate Virtual Environment
