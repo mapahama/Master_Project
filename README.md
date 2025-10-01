@@ -80,7 +80,7 @@ Three system variants have been implemented:
     2) Activate Virtual Environment (Step 4)
     3) Navigate to the App (Step 7)
     4) Run the Streamlit App via the following command in the second terminal:
-    streamlit run client.py
+       streamlit run client.py
     
 11. Enter patient data in the form (blood test results, related to Heart Disease risk)
 12. Submit the data by clicking the "send" button. The patient data will be encrypted and sent to the ML-Model for classification.
