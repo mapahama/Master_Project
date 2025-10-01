@@ -70,18 +70,26 @@ Three system variants have been implemented:
    ```bash
    #Example: Navigating to App GLVQ
    cd App GLVQ
-9. Start the Server
+9. Start the Server 
    ```bash
    uvicorn server:app --reload
+   (if You want to run  (App GLVQ sgn Approx), then You have to restart the server after Step 10)
 10. Start User Interface (Client)
     ```bash
+    1) Open a second terminal
+    2) Activate Virtual Environment (Step 4)
+    3) Navigate to the App (Step 7)
+    4) Run the Streamlit App via the following command in the second terminal:
     streamlit run client.py
+    
 11. Enter patient data in the form (blood test results, related to Heart Disease risk)
 12. Submit the data by clicking the "send" button. The patient data will be encrypted and sent to the ML-Model for classification.
+    
 13. Wait ~5 seconds for the ML-Model to compute the result
 14. The ML model will classify the input as either:
     - healthy (low risk of heart disease), or
     - ill (higher risk of heart disease)
+  
 15. The result will be visualized in both a table and chart
 16. A short explanation will describe why the model chose this classification based on the input features
    
