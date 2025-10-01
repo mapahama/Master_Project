@@ -42,7 +42,7 @@ Three system variants have been implemented:
    ```bash
    git clone https://github.com/mapahama/Master_Project.git
    cd Master_Project
-2. Python version 3.11 or higher is required
+2. Python version 3.11 required (libraries are adjusted to version 3.11)
    ```bash
    https://www.python.org/downloads/release/python-3110/
 3. Python Virtual Environment is required
@@ -59,12 +59,29 @@ Three system variants have been implemented:
    source venv311/bin/activate
 5. Configure VS Code to use venv311
    ```bash
-    1) In VS Code, press Ctrl+Shift+P.
+    1) In VS Code, press Ctrl+Shift+P
     2) Search for “Python: Select Interpreter” and select it.
     3) Choose the interpreter from your venv311 folder
        (e.g. .\venv311\Scripts\python.exe on Windows).
 6. Install Libraries and Dependencies
    ```bash
    pip install -r requirements.txt
-7. TODO
+7. Select which App should be used. Navigate in the console to (App GLVQ) or (App GMLVQ) or (App GLVQ sgn Approx)
+   ```bash
+   #Example: Navigating to App GLVQ
+   cd App GLVQ
+9. Start the Server
+   ```bash
+   uvicorn server:app --reload
+10. Start User Interface (Client)
+    ```bash
+    streamlit run client.py
+11. Enter patient data in the form (blood test results, related to Heart Disease risk)
+12. Submit the data by clicking the "send" button. The patient data will be encrypted and sent to the ML-Model for classification.
+13. Wait ~5 seconds for the ML-Model to compute the result
+14. The ML model will classify the input as either:
+    - healthy (low risk of heart disease), or
+    - ill (higher risk of heart disease)
+15. The result will be visualized in both a table and chart
+16. A short explanation will describe why the model chose this classification based on the input features
    
