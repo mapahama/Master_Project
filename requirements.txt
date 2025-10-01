@@ -1,24 +1,41 @@
+# =========================
 # Web framework & server
+# =========================
 uvicorn[standard]==0.37.0
-fastapi==0.117.1
-pydantic==2.8.2
-pydantic-core==2.20.1
+fastapi
+pydantic
+pydantic-core
 
-# UI frontend
+# =========================
+# UI / Frontend & Visualization
+# =========================
 streamlit
 plotly
 matplotlib==3.10.1
+altair==5.3.0
 
-# Data handling & ML
+# =========================
+# Data handling & Machine Learning
+# =========================
 pandas==2.2.3
 numpy==1.26.4
-scikit-learn==1.6.1
-sklearn-lvq==1.1.1 
-scipy== 1.10.0      
+scikit-learn
+sklearn-lvq==1.1.1
+scipy==1.10.0
+joblib  
 
+# =========================
 # Homomorphic encryption
-tenseal==0.3.16
-joblib
+# =========================
+tenseal
 
-# HTTP requests
+# =========================
+# HTTP requests / Networking
+# =========================
 requests
+
+# =========================
+# Internals / Streamlit dependencies
+# =========================
+pyarrow==15.0.2
+rpds-py==0.13.2
