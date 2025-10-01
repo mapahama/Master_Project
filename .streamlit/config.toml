@@ -1,5 +1,5 @@
 [tool.streamlit]
-python_version = "3.9"
+python_version = "3.11"
 
 [logger]
 level = "info"
