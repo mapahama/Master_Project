@@ -93,10 +93,11 @@ Three system variants have been implemented:
 15. The result will be visualized in both a table and chart
 16. A short explanation will describe why the model chose this classification based on the input features
 
-## License and Copyright Notice
+## License and Copyright 
 
 The software and documentation in this repository are licensed under the **Creative Commons Attribution-NonCommercial 4.0 International Public License (CC BY-NC 4.0)**.
 
+### Core Conditions:
 1.  **Attribution (BY):** You must credit the original creator.
 2.  **NonCommercial (NC):** You may **not** use the material for commercial purposes (e.g., resale, use in proprietary commercial products).
 
