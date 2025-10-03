@@ -92,4 +92,12 @@ Three system variants have been implemented:
   
 15. The result will be visualized in both a table and chart
 16. A short explanation will describe why the model chose this classification based on the input features
-   
+
+## License
+
+This repository and its code are released under the **MIT License**.
+
+**Copyright © 2025 Martin Kirilov**
+
+Any person using, copying, or distributing this code must include the copyright and permission notices. 
+The underlying research methods (CKKS, GLVQ, GMLVQ implementation details) are based on the author's Master's thesis, "Classification of homomorphically encrypted data."
