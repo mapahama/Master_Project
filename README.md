@@ -97,7 +97,7 @@ Three system variants have been implemented:
 ## License and Copyright 
 
 - This code is licensed under the PolyForm Noncommercial License 1.0.0 (see LICENSE).
-- Add-on: Academic & personal use is expressly permitted (see ACADEMIC-EXCEPTION.md).
 - Commercial use (including selling, paid SaaS, or integration into commercial products) is not allowed.
-
+- Add-on: Academic & personal use is expressly permitted (see ACADEMIC-EXCEPTION.md).
+  
 **Copyright © 2025 Martin Kirilov. All rights reserved.**
