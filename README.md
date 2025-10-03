@@ -96,12 +96,8 @@ Three system variants have been implemented:
 
 ## License and Copyright 
 
-The software and documentation in this repository are licensed under the **Creative Commons Attribution-NonCommercial 4.0 International Public License (CC BY-NC 4.0)**.
+This code is licensed under the PolyForm Noncommercial License 1.0.0 (see LICENSE).
+Add-on: Academic & personal use is expressly permitted (see ACADEMIC-EXCEPTION.md).
+Commercial use (including selling, paid SaaS, or integration into commercial products) is not allowed.
 
-### Core Conditions:
-1.  **Attribution (BY):** You must credit the original creator.
-2.  **NonCommercial (NC):** You may **not** use the material for commercial purposes (e.g., resale, use in proprietary commercial products).
-
-You are free to copy, use, and modify the code for private and academic purposes, provided proper credit is given.
-
-**Copyright © 2025 Martin Kirilov**
+**Copyright © 2025 Martin Kirilov. All rights reserved.**
