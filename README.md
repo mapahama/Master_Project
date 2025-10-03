@@ -92,6 +92,7 @@ Three system variants have been implemented:
   
 15. The result will be visualized in both a table and chart
 16. A short explanation will describe why the model chose this classification based on the input features
+-----------------------------------------------------------------------------------
 
 ## License and Copyright 
 
